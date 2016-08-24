@@ -1,4 +1,4 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.dynamo.generic.ordered
 
 import awscala.ByteBuffer
 import awscala.dynamodbv2.{Attribute, AttributeValue}

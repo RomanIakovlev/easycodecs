@@ -1,11 +1,10 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.dynamo.generic.ordered
 
 import awscala.dynamodbv2.{Attribute, AttributeValue}
 import org.specs2.mutable.Specification
-import Decoder._
 
-class GenericDecoderTest extends Specification {
-  "Generic decoder derivation facility should" >> {
+class OrderedDecoderTest extends Specification {
+  "Ordered generic decoder derivation facility should" >> {
     "Derive decoder for a simple case class" >> {
       case class Simple(s: String, t: String, n: Int, l: Long)
       val res = Decoder[Simple](
