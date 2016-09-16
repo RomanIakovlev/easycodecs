@@ -8,7 +8,8 @@ scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.2",
-  "com.github.seratch" %% "awscala" % "0.5.7"
+  "com.github.seratch" %% "awscala" % "0.5.7",
+  "org.typelevel" %% "cats" % "0.7.2"
 )
 
 libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.4" % "test")
