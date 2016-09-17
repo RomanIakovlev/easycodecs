@@ -49,5 +49,14 @@ class ExperimentalDecoderTest extends Specification {
       res must not be empty
       res.get must_== Parent(List("bla"))
     }
+    "Decode optional fields" >> {
+      case class Optional(o: Option[String])
+      val res1 = Decoder[Optional](Map("o" -> AttributeValue("123")))
+      res1 must not be empty
+      res1.get must_== Optional(Some("123"))
+      val res2 = Decoder[Optional](Map())
+      res2 must not be empty
+      res2.get must_== Optional(None)
+    }
   }
 }
