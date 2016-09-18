@@ -58,5 +58,20 @@ class ExperimentalDecoderTest extends Specification {
       res2 must not be empty
       res2.get must_== Optional(None)
     }
+    "Fail to decode optional fields if attribute has wrong type" >> {
+      case class Optional(o: Option[String])
+      val res = Decoder[Optional](Map("o" -> AttributeValue(123)))
+      res must beEmpty
+    }
+    "Decode map field as a simple map, not nested class" >> {
+      case class MapHostString(m: Map[String, String])
+      val res = Decoder[MapHostString](Map("m" -> AttributeValue("hello" -> AttributeValue("world"))))
+      res must not be empty
+      res.get must_== MapHostString(Map("hello" -> "world"))
+      case class MapHostInt(m: Map[String, Int])
+      val res1 = Decoder[MapHostInt](Map("m" -> AttributeValue("hello" -> AttributeValue(123))))
+      res1 must not be empty
+      res1.get must_== MapHostInt(Map("hello" -> 123))
+    }
   }
 }

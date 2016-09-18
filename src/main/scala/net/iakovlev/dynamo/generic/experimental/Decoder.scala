@@ -15,11 +15,13 @@ case class AttributeValueNumeric(value: Int) extends AttributeValueScalar
 case class AttributeValueString(value: String) extends AttributeValueScalar
 case class AttributeValueMap(value: Map[String, AttributeValue])
     extends AttributeValueDocument
-case class AttributeValueList(value: List[AttributeValue]) extends AttributeValueDocument
+case class AttributeValueList(value: List[AttributeValue])
+    extends AttributeValueDocument
 
 object AttributeValue {
   def apply(i: Int) = AttributeValueNumeric(i)
   def apply(s: String) = AttributeValueString(s)
+  def apply(a: (String, AttributeValue)*) = AttributeValueMap(a.toMap)
 }
 
 trait SingleFieldDecoder[A] {
@@ -27,12 +29,15 @@ trait SingleFieldDecoder[A] {
 }
 
 object SingleFieldDecoder {
-  implicit def optionDecoder[A](implicit d: SingleFieldDecoder[A]) = new SingleFieldDecoder[Option[A]] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[Option[A]] = {
-      println("option decoder")
-      Some(d.decode(attributeValue))
+  implicit def optionDecoder[A](implicit d: SingleFieldDecoder[A]) =
+    new SingleFieldDecoder[Option[A]] {
+      override def decode(
+          attributeValue: Option[AttributeValue]): Option[Option[A]] = {
+        println("option decoder")
+        if (attributeValue.isEmpty) Some(None)
+        else d.decode(attributeValue).map(Some.apply)
+      }
     }
-  }
 
   implicit def intDecoder = new SingleFieldDecoder[Int] {
     override def decode(attributeValue: Option[AttributeValue]): Option[Int] = {
@@ -44,7 +49,8 @@ object SingleFieldDecoder {
     }
   }
   implicit def stringDecoder = new SingleFieldDecoder[String] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[String] = {
+    override def decode(
+        attributeValue: Option[AttributeValue]): Option[String] = {
       println("string decoder")
       attributeValue match {
         case Some(AttributeValueString(value)) => Some(value)
@@ -52,24 +58,39 @@ object SingleFieldDecoder {
       }
     }
   }
-  implicit def mapDecoder[A](implicit dm: MapDecoder[A], t: Typeable[A]) =
-    new SingleFieldDecoder[A] {
-      override def decode(attributeValue: Option[AttributeValue])
-        : Option[A] = {
-        println("map decoder " + t.describe)
+  implicit def mapAsMapDecoder[A](implicit d: SingleFieldDecoder[A],
+                                  t: Typeable[A]) =
+    new SingleFieldDecoder[Map[String, A]] {
+      override def decode(
+          attributeValue: Option[AttributeValue]): Option[Map[String, A]] = {
         attributeValue match {
-          case Some(AttributeValueMap(value)) => dm.decode(AttributeValueMap(value))
+          case Some(AttributeValueMap(value)) =>
+            value.mapValues(Some.apply).mapValues(d.decode).sequence
           case _ => None
         }
       }
     }
-  implicit def listDecoder[A](implicit d: SingleFieldDecoder[A], t: Typeable[A]) =
+  implicit def mapAsClassDecoder[A](implicit dm: MapDecoder[A],
+                                    t: Typeable[A]) =
+    new SingleFieldDecoder[A] {
+      override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
+        println("map decoder " + t.describe)
+        attributeValue match {
+          case Some(AttributeValueMap(value)) =>
+            dm.decode(AttributeValueMap(value))
+          case _ => None
+        }
+      }
+    }
+  implicit def listDecoder[A](implicit d: SingleFieldDecoder[A],
+                              t: Typeable[A]) =
     new SingleFieldDecoder[List[A]] {
-      override def decode(attributeValue: Option[AttributeValue])
-        : Option[List[A]] = {
+      override def decode(
+          attributeValue: Option[AttributeValue]): Option[List[A]] = {
         println("list decoder " + t.describe)
         attributeValue match {
-          case Some(AttributeValueList(value)) => value.map(Some.apply).traverse(d.decode)
+          case Some(AttributeValueList(value)) =>
+            value.map(Some.apply).traverse(d.decode)
           case _ => None
         }
       }
@@ -82,15 +103,16 @@ trait Decoder[A] {
 
 object Decoder {
   implicit def hNilDecoder = new Decoder[HNil] {
-    override def decode(attributes: Map[String, AttributeValue]): Option[HNil] = Some(HNil)
+    override def decode(
+        attributes: Map[String, AttributeValue]): Option[HNil] = Some(HNil)
   }
   implicit def hConsDecoder[K <: Symbol, H, T <: HList](
       implicit k: Witness.Aux[K],
       d: SingleFieldDecoder[H],
       dt: Decoder[T],
       t: Typeable[H]) = new Decoder[FieldType[K, H] :: T] {
-    override def decode(
-        attributes: Map[String, AttributeValue]): Option[FieldType[K, H] :: T] = {
+    override def decode(attributes: Map[String, AttributeValue])
+      : Option[FieldType[K, H] :: T] = {
       println("hcons decoder " + t.describe)
       val attr = attributes.get(k.value.name)
       for {
@@ -109,7 +131,8 @@ object Decoder {
     }
   }
 
-  def apply[A](attributes: Map[String, AttributeValue])(implicit da: Decoder[A]): Option[A] = {
+  def apply[A](attributes: Map[String, AttributeValue])(
+      implicit da: Decoder[A]): Option[A] = {
     da.decode(attributes)
   }
 }
