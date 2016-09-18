@@ -36,5 +36,12 @@ class ExperimentalEncoderTest extends Specification {
         "l" -> AttributeValue(AttributeValue("s" -> AttributeValue("hello")),
                               AttributeValue("s" -> AttributeValue("world"))))
     }
+    "Encode optional fields" >> {
+      case class Optional(o: Option[String])
+      val res = Encoder[Optional](Optional(Some("s")))
+      res must_== Map("o" -> AttributeValue("s"))
+      val res1 = Encoder[Optional](Optional(None))
+      res1 must_== Map.empty
+    }
   }
 }
