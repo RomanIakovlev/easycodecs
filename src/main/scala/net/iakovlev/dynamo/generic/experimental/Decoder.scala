@@ -25,7 +25,47 @@ object SingleFieldDecoder {
     override def decode(attributeValue: Option[AttributeValue]): Option[Int] = {
       println("int decoder")
       attributeValue match {
-        case Some(AttributeValueNumeric(value)) => Some(value)
+        case Some(AttributeValueInt(value)) => Some(value)
+        case _ => None
+      }
+    }
+  }
+
+  implicit def longDecoder = new SingleFieldDecoder[Long] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[Long] = {
+      println("long decoder")
+      attributeValue match {
+        case Some(AttributeValueLong(value)) => Some(value)
+        case _ => None
+      }
+    }
+  }
+
+  implicit def floatDecoder = new SingleFieldDecoder[Float] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[Float] = {
+      println("float decoder")
+      attributeValue match {
+        case Some(AttributeValueFloat(value)) => Some(value)
+        case _ => None
+      }
+    }
+  }
+
+  implicit def doubleDecoder = new SingleFieldDecoder[Double] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[Double] = {
+      println("double decoder")
+      attributeValue match {
+        case Some(AttributeValueDouble(value)) => Some(value)
+        case _ => None
+      }
+    }
+  }
+
+  implicit def bigDecimalDecoder = new SingleFieldDecoder[BigDecimal] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[BigDecimal] = {
+      println("big decimal decoder")
+      attributeValue match {
+        case Some(AttributeValueBigDecimal(value)) => Some(value)
         case _ => None
       }
     }

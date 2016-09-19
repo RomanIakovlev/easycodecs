@@ -3,7 +3,6 @@ package net.iakovlev.dynamo.generic.experimental
 import org.specs2.mutable.Specification
 
 class ExperimentalDecoderTest extends Specification {
-  sequential
   "Experimental generic decoder derivation facility should" >> {
     "Use custom decoder" >> {
       case class Test(s: List[Int])
@@ -72,6 +71,21 @@ class ExperimentalDecoderTest extends Specification {
       val res1 = Decoder[MapHostInt](Map("m" -> AttributeValue("hello" -> AttributeValue(123))))
       res1 must not be empty
       res1.get must_== MapHostInt(Map("hello" -> 123))
+    }
+    "Decode all numeric attributes correctly" >> {
+      case class AllNumerals(i: Int,
+                             l: Long,
+                             f: Float,
+                             d: Double,
+                             b: BigDecimal)
+      val res =
+        Decoder[AllNumerals](Map("i" -> AttributeValue(1),
+          "l" -> AttributeValue(2l),
+          "f" -> AttributeValue(3.0f),
+          "d" -> AttributeValue(4.0d),
+          "b" -> AttributeValue(BigDecimal(1000l))))
+      res must not be empty
+      res.get must_== AllNumerals(1, 2l, 3.0f, 4.0d, BigDecimal(1000l))
     }
   }
 }

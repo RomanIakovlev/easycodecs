@@ -11,10 +11,18 @@ trait SingleFieldEncoder[A] {
 }
 
 object SingleFieldEncoder {
-  implicit val intEncoder = new SingleFieldEncoder[Int] {
-    override def encode(a: Int): Option[AttributeValue] =
-      Some(AttributeValue(a))
+  implicit def numericEncoder[A: Numeric] = new SingleFieldEncoder[A] {
+    override def encode(a: A): Option[AttributeValue] = {
+      Some(a).map {
+        case i: Int => AttributeValue(i)
+        case l: Long => AttributeValue(l)
+        case f: Float => AttributeValue(f)
+        case d: Double => AttributeValue(d)
+        case b: BigDecimal => AttributeValue(b)
+      }
+    }
   }
+
   implicit val stringEncoder = new SingleFieldEncoder[String] {
     override def encode(a: String): Option[AttributeValue] =
       Some(AttributeValue(a))

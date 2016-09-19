@@ -9,6 +9,20 @@ class ExperimentalEncoderTest extends Specification {
       val res = Encoder[Simple](Simple("123", 456))
       res must_== Map("s" -> AttributeValue("123"), "i" -> AttributeValue(456))
     }
+    "Encode all numeric attributes correctly" >> {
+      case class AllNumerals(i: Int,
+                             l: Long,
+                             f: Float,
+                             d: Double,
+                             b: BigDecimal)
+      val res =
+        Encoder[AllNumerals](AllNumerals(1, 2l, 3.0f, 4.0d, BigDecimal(1000l)))
+      res must_== Map("i" -> AttributeValue(1),
+                      "l" -> AttributeValue(2l),
+                      "f" -> AttributeValue(3.0f),
+                      "d" -> AttributeValue(4.0d),
+                      "b" -> AttributeValue(BigDecimal(1000l)))
+    }
     "Encode case class with map" >> {
       case class MapHost(m: Map[String, Int])
       val res = Encoder[MapHost](MapHost(Map("h" -> 1)))
