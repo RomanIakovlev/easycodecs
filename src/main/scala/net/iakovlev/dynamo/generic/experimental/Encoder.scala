@@ -1,7 +1,21 @@
 package net.iakovlev.dynamo.generic.experimental
 
 import shapeless.labelled.FieldType
-import shapeless.{::, HList, HNil, LabelledGeneric, Typeable, Witness}
+import shapeless.{
+  :+:,
+  ::,
+  CNil,
+  Coproduct,
+  HList,
+  HNil,
+  Inl,
+  Inr,
+  LabelledGeneric,
+  Lazy,
+  LowPriority,
+  Typeable,
+  Witness
+}
 
 import scala.language.higherKinds
 import cats.implicits._
@@ -11,6 +25,7 @@ trait SingleFieldEncoder[A] {
 }
 
 object SingleFieldEncoder {
+
   implicit def numericEncoder[A: Numeric] = new SingleFieldEncoder[A] {
     override def encode(a: A): Option[AttributeValue] = {
       Some(a).map {
@@ -44,6 +59,13 @@ object SingleFieldEncoder {
       }
     }
 
+  implicit def coproductAsClassEncoder[A](implicit e: CoproductEncoder[A]) =
+    new SingleFieldEncoder[A] {
+      override def encode(a: A): Option[AttributeValue] = {
+        e.encode(a)
+      }
+    }
+
   implicit def listEncoder[A](implicit e: SingleFieldEncoder[A]) =
     new SingleFieldEncoder[List[A]] {
       override def encode(a: List[A]): Option[AttributeValue] = {
@@ -56,6 +78,13 @@ object SingleFieldEncoder {
       override def encode(a: Option[A]): Option[AttributeValue] =
         a.flatMap(e.encode)
     }
+
+  implicit def encodeCaseObject[A <: Product](
+      implicit gen: LabelledGeneric.Aux[A, HNil]) = new SingleFieldEncoder[A] {
+    override def encode(a: A): Option[AttributeValue] = {
+      Some(AttributeValue(a.productPrefix))
+    }
+  }
 }
 
 trait Encoder[A] {
@@ -63,29 +92,28 @@ trait Encoder[A] {
 }
 
 object Encoder {
-  implicit def hNilEncode[H <: HNil] = new Encoder[HNil] {
+  implicit def hNilEncoder[H <: HNil] = new Encoder[HNil] {
     override def encode(a: HNil): Map[String, Option[AttributeValue]] =
       Map.empty
   }
-
-  implicit def hConsEncode[K <: Symbol, H, T <: HList](
+  implicit def hConsEncoder[K <: Symbol, H, T <: HList](
       implicit eh: SingleFieldEncoder[H],
-      et: Encoder[T],
+      et: Lazy[Encoder[T]],
       k: Witness.Aux[K]) =
     new Encoder[FieldType[K, H] :: T] {
       override def encode(
           a: FieldType[K, H] :: T): Map[String, Option[AttributeValue]] = {
         println("encode hCons")
-        et.encode(a.tail) + (k.value.name -> eh.encode(a.head))
+        et.value.encode(a.tail) + (k.value.name -> eh.encode(a.head))
       }
     }
 
   implicit def caseClassEncoder[A, R](implicit lg: LabelledGeneric.Aux[A, R],
-                                      e: Encoder[R],
+                                      e: Lazy[Encoder[R]],
                                       t: Typeable[A]) = new Encoder[A] {
     override def encode(a: A): Map[String, Option[AttributeValue]] = {
       println("case class encode " + t.describe)
-      e.encode(lg.to(a))
+      e.value.encode(lg.to(a))
     }
   }
 
@@ -96,11 +124,46 @@ object Encoder {
     flattenMapValues(e.encode(a))
 }
 
+trait CoproductEncoder[A] {
+  def encode(a: A): Option[AttributeValue]
+}
+
+object CoproductEncoder {
+  implicit def cNilEncoder = new CoproductEncoder[CNil] {
+    override def encode(a: CNil): Option[AttributeValue] =
+      None
+  }
+
+  implicit def coproductEncoder[K <: Symbol, H, T <: Coproduct](
+      implicit eh: SingleFieldEncoder[H],
+      et: SingleFieldEncoder[T],
+      k: Witness.Aux[K]) =
+    new CoproductEncoder[FieldType[K, H] :+: T] {
+      override def encode(a: FieldType[K, H] :+: T): Option[AttributeValue] = {
+        println("encode coproduct")
+        a match {
+          case Inl(head) => eh.encode(head)
+          case Inr(tail) => et.encode(tail)
+        }
+      }
+    }
+
+  implicit def genericEncoder[A, R <: Coproduct](
+      implicit lg: LabelledGeneric.Aux[A, R],
+      e: Lazy[CoproductEncoder[R]]) = new CoproductEncoder[A] {
+    override def encode(a: A): Option[AttributeValue] = {
+      println("coproduct generic encoder")
+      e.value.encode(lg.to(a))
+    }
+  }
+}
+
 trait MapEncoder[A] {
   def encode(a: A): Option[AttributeValueMap]
 }
 
 object MapEncoder {
+
   implicit def hNilEncode[H <: HNil] = new MapEncoder[HNil] {
     override def encode(a: HNil): Option[AttributeValueMap] =
       Some(AttributeValueMap(Map.empty))

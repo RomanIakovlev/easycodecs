@@ -42,7 +42,8 @@ object SingleFieldDecoder {
   }
 
   implicit def floatDecoder = new SingleFieldDecoder[Float] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[Float] = {
+    override def decode(
+        attributeValue: Option[AttributeValue]): Option[Float] = {
       println("float decoder")
       attributeValue match {
         case Some(AttributeValueFloat(value)) => Some(value)
@@ -52,7 +53,8 @@ object SingleFieldDecoder {
   }
 
   implicit def doubleDecoder = new SingleFieldDecoder[Double] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[Double] = {
+    override def decode(
+        attributeValue: Option[AttributeValue]): Option[Double] = {
       println("double decoder")
       attributeValue match {
         case Some(AttributeValueDouble(value)) => Some(value)
@@ -62,7 +64,8 @@ object SingleFieldDecoder {
   }
 
   implicit def bigDecimalDecoder = new SingleFieldDecoder[BigDecimal] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[BigDecimal] = {
+    override def decode(
+        attributeValue: Option[AttributeValue]): Option[BigDecimal] = {
       println("big decimal decoder")
       attributeValue match {
         case Some(AttributeValueBigDecimal(value)) => Some(value)
@@ -124,6 +127,21 @@ trait Decoder[A] {
 }
 
 object Decoder {
+  implicit def cNilDecoder = new SingleFieldDecoder[CNil] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[CNil] = {
+      None
+    }
+  }/*
+  implicit def cConsDecoder[K <: Symbol, H, T <: Coproduct](
+      implicit k: Witness.Aux[K],
+      eh: SingleFieldDecoder[H],
+      et: Decoder[T]) = new Decoder[H :+: T] {
+    override def decode(attributes: Map[String, AttributeValue]): Option[H :+: T] = {
+      val attr = attributes.get(k.value.name)
+      eh.decode(attr) match
+    }
+  }*/
+
   implicit def hNilDecoder = new Decoder[HNil] {
     override def decode(
         attributes: Map[String, AttributeValue]): Option[HNil] = Some(HNil)

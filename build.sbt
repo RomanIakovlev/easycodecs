@@ -1,6 +1,6 @@
 name := "dynamo-generic"
 
-version := "0.1`"
+version := "0.1"
 
 organization := "net.iakovlev"
 
@@ -15,3 +15,5 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.4" % "test")
 
 scalacOptions in Test ++= Seq("-Yrangepos")
+
+scalacOptions ++= Seq("-Xlog-implicits")

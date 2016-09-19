@@ -57,5 +57,27 @@ class ExperimentalEncoderTest extends Specification {
       val res1 = Encoder[Optional](Optional(None))
       res1 must_== Map.empty
     }
+    "Encode ADT via coproduct" >> {
+      sealed trait ADT
+      case class B(b: String) extends ADT
+      case class C(c: String) extends ADT
+      case class O(b: ADT, c: ADT)
+      val res = Encoder[O](O(B("B"), C("C")))
+      res must_== Map("b" -> AttributeValue("b" -> AttributeValue("B")),
+                      "c" -> AttributeValue("c" -> AttributeValue("C")))
+    }
+    "Encode ADT enum as strings" >> {
+      sealed trait ADT
+      case object B extends ADT
+      case object C extends ADT
+      case class D() extends ADT
+      case class E(e: String) extends ADT
+      case class O(b: ADT, c: ADT, d: ADT, e: E)
+      val res = Encoder[O](O(B, C, D(), E("E")))
+      res must_== Map("b" -> AttributeValue("B"),
+                      "c" -> AttributeValue("C"),
+                      "d" -> AttributeValue("D"),
+                      "e" -> AttributeValue("e" -> AttributeValue("E")))
+    }
   }
 }
