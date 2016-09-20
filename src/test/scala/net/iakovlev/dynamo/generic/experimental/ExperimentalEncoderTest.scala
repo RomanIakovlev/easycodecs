@@ -65,6 +65,10 @@ class ExperimentalEncoderTest extends Specification {
       val res = Encoder[O](O(B("B"), C("C")))
       res must_== Map("b" -> AttributeValue("b" -> AttributeValue("B")),
                       "c" -> AttributeValue("c" -> AttributeValue("C")))
+      case class P(b: B, c: C)
+      val res1 = Encoder[P](P(B("B"), C("C")))
+      res1 must_== Map("b" -> AttributeValue("b" -> AttributeValue("B")),
+                       "c" -> AttributeValue("c" -> AttributeValue("C")))
     }
     "Encode ADT enum as strings" >> {
       sealed trait ADT

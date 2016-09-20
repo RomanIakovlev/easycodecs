@@ -105,5 +105,14 @@ class ExperimentalDecoderTest extends Specification {
       res must not be empty
       res.get must_== O(A("AAA"), B("BBB"))
     }
+    "Decode case objects as strings" >> {
+      sealed trait ADT
+      case object A extends ADT
+      case object B extends ADT
+      case class O(a: ADT, b: ADT)
+      val res = Decoder[O](Map("a" -> AttributeValue("A"), "b" -> AttributeValue("B")))
+      res must not be empty
+      res.get must_== O(A, B)
+    }
   }
 }

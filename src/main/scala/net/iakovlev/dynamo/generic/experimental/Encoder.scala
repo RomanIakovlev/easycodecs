@@ -12,7 +12,6 @@ import shapeless.{
   Inr,
   LabelledGeneric,
   Lazy,
-  LowPriority,
   Typeable,
   Witness
 }

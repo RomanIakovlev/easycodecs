@@ -120,12 +120,23 @@ object SingleFieldDecoder {
         }
       }
     }
-  implicit def coproductAsClassDecoder[A](implicit d: Lazy[CoproductDecoder[A]]) =
+  implicit def coproductAsClassDecoder[A](
+      implicit d: Lazy[CoproductDecoder[A]],
+      lp: LowPriority) =
     new SingleFieldDecoder[A] {
       override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
         d.value.decode(attributeValue)
       }
     }
+
+  implicit def decodeEnum[A, C <: Coproduct](
+      implicit gen: LabelledGeneric.Aux[A, C],
+      ds: SingleFieldDecoder[String],
+      rie: IsEnum[C]) = new SingleFieldDecoder[A] {
+    override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
+      ds.decode(attributeValue).flatMap(s => rie.from(s).map(gen.from))
+    }
+  }
 }
 
 trait Decoder[A] {
