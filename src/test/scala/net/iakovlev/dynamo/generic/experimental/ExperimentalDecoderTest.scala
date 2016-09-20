@@ -7,27 +7,29 @@ class ExperimentalDecoderTest extends Specification {
     "Use custom decoder" >> {
       case class Test(s: List[Int])
       val d = new Decoder[Test] {
-        override def decode(attributes: Map[String, AttributeValue]): Option[Test] = {
+        override def decode(
+            attributes: Map[String, AttributeValue]): Option[Test] = {
           attributes.get("s").flatMap {
-            case AttributeValueString(value) => Some(Test(value.split(",").map(_.toInt).toList))
+            case AttributeValueString(value) =>
+              Some(Test(value.split(",").map(_.toInt).toList))
             case _ => None
           }
         }
       }
       val res = d.decode(Map("s" -> AttributeValue("1,2,3")))
       res must not be empty
-      res.get must_== Test(List(1,2,3))
+      res.get must_== Test(List(1, 2, 3))
     }
     "Use map based decoder for nested classes" >> {
       case class Child(s: String)
       case class Custom(c: Child, s: String)
       case class Parent(s: String, c: Custom)
       val res = Decoder[Parent](
-        Map("s" -> AttributeValue("hello"),
-            "c" -> AttributeValueMap(
-              Map("s" -> AttributeValue("world"),
-                  "c" -> AttributeValueMap(
-                    Map("s" -> AttributeValue("lol")))))))
+        Map(
+          "s" -> AttributeValue("hello"),
+          "c" -> AttributeValueMap(
+            Map("s" -> AttributeValue("world"),
+                "c" -> AttributeValueMap(Map("s" -> AttributeValue("lol")))))))
       res must not be empty
       res.get must_== Parent("hello", Custom(Child("lol"), "world"))
     }
@@ -35,7 +37,9 @@ class ExperimentalDecoderTest extends Specification {
       case class Child(s: String)
       case class Parent(c: List[Child])
       val res = Decoder[Parent](
-        Map("c" -> AttributeValueList(List(AttributeValueMap(Map("s" -> AttributeValue("bla"))))))
+        Map(
+          "c" -> AttributeValueList(
+            List(AttributeValueMap(Map("s" -> AttributeValue("bla"))))))
       )
       res must not be empty
       res.get must_== Parent(List(Child("bla")))
@@ -64,11 +68,13 @@ class ExperimentalDecoderTest extends Specification {
     }
     "Decode map field as a simple map, not nested class" >> {
       case class MapHostString(m: Map[String, String])
-      val res = Decoder[MapHostString](Map("m" -> AttributeValue("hello" -> AttributeValue("world"))))
+      val res = Decoder[MapHostString](
+        Map("m" -> AttributeValue("hello" -> AttributeValue("world"))))
       res must not be empty
       res.get must_== MapHostString(Map("hello" -> "world"))
       case class MapHostInt(m: Map[String, Int])
-      val res1 = Decoder[MapHostInt](Map("m" -> AttributeValue("hello" -> AttributeValue(123))))
+      val res1 = Decoder[MapHostInt](
+        Map("m" -> AttributeValue("hello" -> AttributeValue(123))))
       res1 must not be empty
       res1.get must_== MapHostInt(Map("hello" -> 123))
     }
@@ -79,13 +85,25 @@ class ExperimentalDecoderTest extends Specification {
                              d: Double,
                              b: BigDecimal)
       val res =
-        Decoder[AllNumerals](Map("i" -> AttributeValue(1),
-          "l" -> AttributeValue(2l),
-          "f" -> AttributeValue(3.0f),
-          "d" -> AttributeValue(4.0d),
-          "b" -> AttributeValue(BigDecimal(1000l))))
+        Decoder[AllNumerals](
+          Map("i" -> AttributeValue(1),
+              "l" -> AttributeValue(2l),
+              "f" -> AttributeValue(3.0f),
+              "d" -> AttributeValue(4.0d),
+              "b" -> AttributeValue(BigDecimal(1000l))))
       res must not be empty
       res.get must_== AllNumerals(1, 2l, 3.0f, 4.0d, BigDecimal(1000l))
+    }
+    "Decode into ADT" >> {
+      sealed trait ADT
+      case class A(a: String) extends ADT
+      case class B(b: String) extends ADT
+      case class O(a: ADT, b: ADT)
+      val res = Decoder[O](
+        Map("a" -> AttributeValue("a" -> AttributeValue("AAA")),
+            "b" -> AttributeValue("b" -> AttributeValue("BBB"))))
+      res must not be empty
+      res.get must_== O(A("AAA"), B("BBB"))
     }
   }
 }

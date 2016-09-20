@@ -120,6 +120,12 @@ object SingleFieldDecoder {
         }
       }
     }
+  implicit def coproductAsClassDecoder[A](implicit d: Lazy[CoproductDecoder[A]]) =
+    new SingleFieldDecoder[A] {
+      override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
+        d.value.decode(attributeValue)
+      }
+    }
 }
 
 trait Decoder[A] {
@@ -127,20 +133,6 @@ trait Decoder[A] {
 }
 
 object Decoder {
-  implicit def cNilDecoder = new SingleFieldDecoder[CNil] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[CNil] = {
-      None
-    }
-  }/*
-  implicit def cConsDecoder[K <: Symbol, H, T <: Coproduct](
-      implicit k: Witness.Aux[K],
-      eh: SingleFieldDecoder[H],
-      et: Decoder[T]) = new Decoder[H :+: T] {
-    override def decode(attributes: Map[String, AttributeValue]): Option[H :+: T] = {
-      val attr = attributes.get(k.value.name)
-      eh.decode(attr) match
-    }
-  }*/
 
   implicit def hNilDecoder = new Decoder[HNil] {
     override def decode(
@@ -174,6 +166,35 @@ object Decoder {
   def apply[A](attributes: Map[String, AttributeValue])(
       implicit da: Decoder[A]): Option[A] = {
     da.decode(attributes)
+  }
+}
+
+trait CoproductDecoder[A] {
+  def decode(a: Option[AttributeValue]): Option[A]
+}
+
+object CoproductDecoder {
+  implicit val cNilDecoder = new CoproductDecoder[CNil] {
+    override def decode(a: Option[AttributeValue]): Option[CNil] = None
+  }
+
+  implicit def coproductDecoder[K <: Symbol, H, T <: Coproduct](
+      implicit dh: SingleFieldDecoder[H],
+      dt: SingleFieldDecoder[T]) =
+    new CoproductDecoder[FieldType[K, H] :+: T] {
+      override def decode(
+          a: Option[AttributeValue]): Option[FieldType[K, H] :+: T] = {
+        dh.decode(a)
+          .map(aa => Inl(field[K](aa)))
+          .orElse(dt.decode(a).map(Inr(_)))
+      }
+    }
+  implicit def genericDecoder[A, R <: Coproduct](
+      implicit lg: LabelledGeneric.Aux[A, R],
+      d: CoproductDecoder[R]) = new CoproductDecoder[A] {
+    override def decode(a: Option[AttributeValue]): Option[A] = {
+      d.decode(a).map(lg.from)
+    }
   }
 }
 
