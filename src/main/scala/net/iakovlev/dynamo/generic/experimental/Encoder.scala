@@ -1,20 +1,7 @@
 package net.iakovlev.dynamo.generic.experimental
 
 import shapeless.labelled.FieldType
-import shapeless.{
-  :+:,
-  ::,
-  CNil,
-  Coproduct,
-  HList,
-  HNil,
-  Inl,
-  Inr,
-  LabelledGeneric,
-  Lazy,
-  Typeable,
-  Witness
-}
+import shapeless.{:+:, ::, CNil, Coproduct, HList, HNil, Inl, Inr, LabelledGeneric, Lazy, LowPriority, Typeable, Witness}
 
 import scala.language.higherKinds
 import cats.implicits._
@@ -58,7 +45,7 @@ object SingleFieldEncoder {
       }
     }
 
-  implicit def coproductAsClassEncoder[A](implicit e: CoproductEncoder[A]) =
+  implicit def coproductAsClassEncoder[A](implicit e: CoproductEncoder[A], lp: LowPriority) =
     new SingleFieldEncoder[A] {
       override def encode(a: A): Option[AttributeValue] = {
         e.encode(a)
@@ -78,10 +65,12 @@ object SingleFieldEncoder {
         a.flatMap(e.encode)
     }
 
-  implicit def encodeCaseObject[A <: Product](
-      implicit gen: LabelledGeneric.Aux[A, HNil]) = new SingleFieldEncoder[A] {
+  implicit def encodeEnum[A, C <: Coproduct](
+      implicit lg: LabelledGeneric.Aux[A, C],
+      rie: IsEnum[C],
+      es: SingleFieldEncoder[String]) = new SingleFieldEncoder[A] {
     override def encode(a: A): Option[AttributeValue] = {
-      Some(AttributeValue(a.productPrefix))
+      es.encode(rie.to(lg.to(a)))
     }
   }
 }

@@ -74,14 +74,10 @@ class ExperimentalEncoderTest extends Specification {
       sealed trait ADT
       case object B extends ADT
       case object C extends ADT
-      case class D() extends ADT
-      case class E(e: String) extends ADT
-      case class O(b: ADT, c: ADT, d: ADT, e: E)
-      val res = Encoder[O](O(B, C, D(), E("E")))
+      case class O(b: ADT, c: ADT)
+      val res = Encoder[O](O(B, C))
       res must_== Map("b" -> AttributeValue("B"),
-                      "c" -> AttributeValue("C"),
-                      "d" -> AttributeValue("D"),
-                      "e" -> AttributeValue("e" -> AttributeValue("E")))
+                      "c" -> AttributeValue("C"))
     }
   }
 }
