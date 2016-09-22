@@ -1,4 +1,4 @@
-package net.iakovlev.dynamo.generic.experimental
+package net.iakovlev.dynamo.generic
 
 import shapeless.{:+:, CNil, Coproduct, Generic, HNil, Inl, Inr, Witness}
 import shapeless.labelled._

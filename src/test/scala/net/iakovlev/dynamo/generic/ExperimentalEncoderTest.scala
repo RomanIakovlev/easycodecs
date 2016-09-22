@@ -1,4 +1,4 @@
-package net.iakovlev.dynamo.generic.experimental
+package net.iakovlev.dynamo.generic
 
 import org.specs2.mutable.Specification
 

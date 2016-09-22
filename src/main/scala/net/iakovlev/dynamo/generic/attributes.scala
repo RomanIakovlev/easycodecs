@@ -1,4 +1,4 @@
-package net.iakovlev.dynamo.generic.experimental
+package net.iakovlev.dynamo.generic
 
 sealed trait AttributeValue
 sealed trait AttributeValueScalar extends AttributeValue

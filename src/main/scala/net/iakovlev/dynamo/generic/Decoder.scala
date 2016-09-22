@@ -1,8 +1,8 @@
-package net.iakovlev.dynamo.generic.experimental
+package net.iakovlev.dynamo.generic
 
+import cats.implicits._
 import shapeless._
 import shapeless.labelled.{FieldType, field}
-import cats.implicits._
 
 import scala.language.higherKinds
 

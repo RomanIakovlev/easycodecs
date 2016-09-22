@@ -1,10 +1,10 @@
-package net.iakovlev.dynamo.generic.experimental
+package net.iakovlev.dynamo.generic
 
+import cats.implicits._
 import shapeless.labelled.FieldType
 import shapeless.{:+:, ::, CNil, Coproduct, HList, HNil, Inl, Inr, LabelledGeneric, Lazy, LowPriority, Typeable, Witness}
 
 import scala.language.higherKinds
-import cats.implicits._
 
 trait SingleFieldEncoder[A] {
   def encode(a: A): Option[AttributeValue]
