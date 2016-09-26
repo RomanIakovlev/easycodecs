@@ -2,11 +2,15 @@ package net.iakovlev.dynamo.generic
 
 import org.specs2.mutable.Specification
 
+case class C(a: String, b: Int)
+object C {
+  implicit val pk = FirstFieldPrimaryKey[C]
+}
 class PrimaryKeyTest extends Specification {
   "Primary key derivation facility should" >> {
     "Derive default primary key as first field of class" >> {
-      case class C(a: String, b: Int)
-      val key = PrimaryKey[C]
+
+      val key = PrimaryKey[C, FirstFieldPrimaryKey[C]]
       key.value must_== "a"
 
       // just a bunch of different ways to test the same fact

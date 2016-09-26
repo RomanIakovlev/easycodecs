@@ -13,16 +13,28 @@ trait PrimaryKey[A] {
 }
 
 object PrimaryKey {
-  implicit def default[A, LabelledRepr <: HList, UnlabelledRepr <: HList, Keys <: HList, HV, TV <: HList](
+  def apply[A, PK <: PrimaryKey[A]](implicit pk: PK): pk.KeyName = pk.primaryKeyName
+}
+
+trait FirstFieldPrimaryKey[A] extends PrimaryKey[A]
+
+object FirstFieldPrimaryKey {
+  implicit def default[A,
+                       LabelledRepr <: HList,
+                       UnlabelledRepr <: HList,
+                       Keys <: HList,
+                       HV,
+                       TV <: HList](
       implicit lg: LabelledGeneric.Aux[A, LabelledRepr],
       g: Generic.Aux[A, UnlabelledRepr],
       keys: Keys.Aux[LabelledRepr, Keys],
       isHConsValue: IsHCons.Aux[UnlabelledRepr, HV, TV],
-      ev: ToTraversable.Aux[Keys, List, Symbol]) = new PrimaryKey[A] {
-    type KK = HV
+      ev: ToTraversable.Aux[Keys, List, Symbol]) = new FirstFieldPrimaryKey[A] {
+    override type KK = HV
     override def primaryKeyName: KeyName = {
       KeyName(keys.apply().toList.head.name)
     }
   }
-  def apply[A](implicit pk: PrimaryKey[A]) = pk.primaryKeyName
+
+  def apply[A](implicit pk: FirstFieldPrimaryKey[A]): PrimaryKey[A] = pk
 }
