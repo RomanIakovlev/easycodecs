@@ -6,14 +6,13 @@ import shapeless.{Generic, HList, LabelledGeneric}
 
 trait PrimaryKey[A] {
   type KK
-  case class KeyName(value: String) {
-    type KeyType = KK
-  }
-  def primaryKeyName: KeyName
+  protected val primaryKeyName: String
+  def primaryKeyValue(value: KK): Map[String, KK]
 }
 
 object PrimaryKey {
-  def apply[A, PK <: PrimaryKey[A]](implicit pk: PK): pk.KeyName = pk.primaryKeyName
+  def apply[A, PK <: PrimaryKey[A]](implicit pk: PK): (pk.KK => Map[String, pk.KK]) =
+    (a) => pk.primaryKeyValue(a)
 }
 
 trait FirstFieldPrimaryKey[A] extends PrimaryKey[A]
@@ -23,18 +22,21 @@ object FirstFieldPrimaryKey {
                        LabelledRepr <: HList,
                        UnlabelledRepr <: HList,
                        Keys <: HList,
-                       HV,
-                       TV <: HList](
+                       H](
       implicit lg: LabelledGeneric.Aux[A, LabelledRepr],
       g: Generic.Aux[A, UnlabelledRepr],
       keys: Keys.Aux[LabelledRepr, Keys],
-      isHConsValue: IsHCons.Aux[UnlabelledRepr, HV, TV],
+      isHC: IsHCons.Aux[UnlabelledRepr, H, _],
       ev: ToTraversable.Aux[Keys, List, Symbol]) = new FirstFieldPrimaryKey[A] {
-    override type KK = HV
-    override def primaryKeyName: KeyName = {
-      KeyName(keys.apply().toList.head.name)
+    override type KK = H
+    override val primaryKeyName: String = {
+      keys.apply().toList.head.name
+    }
+
+    override def primaryKeyValue(value: H): Map[String, H] = {
+      Map(primaryKeyName -> value)
     }
   }
 
-  def apply[A](implicit pk: FirstFieldPrimaryKey[A]): PrimaryKey[A] = pk
+  def apply[A](implicit pk: FirstFieldPrimaryKey[A]): FirstFieldPrimaryKey[A] = pk
 }
