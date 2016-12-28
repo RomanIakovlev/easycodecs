@@ -5,6 +5,7 @@ import shapeless._
 import shapeless.labelled.{FieldType, field}
 
 import scala.language.higherKinds
+import scala.util.Try
 
 trait SingleFieldDecoder[A] {
   def decode(attributeValue: Option[AttributeValue]): Option[A]
@@ -26,6 +27,7 @@ object SingleFieldDecoder {
       println("int decoder")
       attributeValue match {
         case Some(AttributeValueInt(value)) => Some(value)
+        case Some(AttributeValueNumeric(value)) => Try(value.toInt).toOption
         case _ => None
       }
     }
@@ -36,6 +38,7 @@ object SingleFieldDecoder {
       println("long decoder")
       attributeValue match {
         case Some(AttributeValueLong(value)) => Some(value)
+        case Some(AttributeValueNumeric(value)) => Try(value.toLong).toOption
         case _ => None
       }
     }
@@ -47,6 +50,7 @@ object SingleFieldDecoder {
       println("float decoder")
       attributeValue match {
         case Some(AttributeValueFloat(value)) => Some(value)
+        case Some(AttributeValueNumeric(value)) => Try(value.toFloat).toOption
         case _ => None
       }
     }
@@ -58,6 +62,7 @@ object SingleFieldDecoder {
       println("double decoder")
       attributeValue match {
         case Some(AttributeValueDouble(value)) => Some(value)
+        case Some(AttributeValueNumeric(value)) => Try(value.toDouble).toOption
         case _ => None
       }
     }
@@ -69,6 +74,7 @@ object SingleFieldDecoder {
       println("big decimal decoder")
       attributeValue match {
         case Some(AttributeValueBigDecimal(value)) => Some(value)
+        case Some(AttributeValueNumeric(value)) => Try(BigDecimal(value)).toOption
         case _ => None
       }
     }
@@ -115,7 +121,7 @@ object SingleFieldDecoder {
         println("list decoder " + t.describe)
         attributeValue match {
           case Some(AttributeValueList(value)) =>
-            value.map(Some.apply).traverse(d.decode)
+            value.toList.map(Some.apply).traverse(d.decode)
           case _ => None
         }
       }

@@ -83,16 +83,18 @@ class ExperimentalDecoderTest extends Specification {
                              l: Long,
                              f: Float,
                              d: Double,
-                             b: BigDecimal)
+                             b: BigDecimal,
+                             n: BigDecimal)
       val res =
         Decoder[AllNumerals](
           Map("i" -> AttributeValue(1),
               "l" -> AttributeValue(2l),
               "f" -> AttributeValue(3.0f),
               "d" -> AttributeValue(4.0d),
-              "b" -> AttributeValue(BigDecimal(1000l))))
+              "b" -> AttributeValue(BigDecimal(1000l)),
+              "n" -> AttributeValueNumeric("2000")))
       res must not be empty
-      res.get must_== AllNumerals(1, 2l, 3.0f, 4.0d, BigDecimal(1000l))
+      res.get must_== AllNumerals(1, 2l, 3.0f, 4.0d, BigDecimal(1000l), BigDecimal(2000l))
     }
     "Decode into ADT" >> {
       sealed trait ADT
