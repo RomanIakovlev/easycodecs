@@ -5,7 +5,11 @@ import shapeless._
 import shapeless.labelled.{FieldType, field}
 
 import scala.language.higherKinds
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
+
+trait PrimitivesExtractor[F[_], A, B] {
+  implicit def extract(a: A): F[B]
+}
 
 trait SingleFieldEffectfulDecoder[F[_], A, B] {
   def decode(a: F[A]): F[B]
@@ -20,6 +24,20 @@ object SingleFieldEffectfulDecoder {
         d.value.decode(ev.value(a))
       }
     }*/
+  implicit def optionalDecoder[F[_], S, E >: Throwable, A](
+      implicit f: ApplicativeError[F, E],
+      d: SingleFieldEffectfulDecoder[F, S, A])
+    : SingleFieldEffectfulDecoder[F, S, Option[A]] =
+    new SingleFieldEffectfulDecoder[F, S, Option[A]] {
+      override def decode(a: F[S]): F[Option[A]] = {
+        d.decode(a).map(Option.apply).recoverWith {
+          case _: NoSuchElementException =>
+            f.pure(None)
+          case e =>
+            f.raiseError(e)
+        }
+      }
+    }
   implicit def coproductAsClassDecoder[F[_], S, A](
       implicit d: Lazy[CoproductEffectfulDecoder[F, S, A]],
       lp: LowPriority) =

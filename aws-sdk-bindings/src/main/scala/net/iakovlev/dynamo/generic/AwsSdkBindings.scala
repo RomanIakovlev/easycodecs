@@ -1,27 +1,13 @@
 package net.iakovlev.dynamo.generic
 
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, GetItemResult}
+import com.amazonaws.services.dynamodbv2.model.GetItemResult
 import com.amazonaws.services.dynamodbv2.{model => aws}
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 import cats.implicits._
-import shapeless.{Coproduct, LabelledGeneric, Lazy, LowPriority}
 
 trait AwsAttributeValueDecoder {
-  implicit def optionalAwsDecoder[A](
-      implicit d: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A])
-    : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, Option[A]] =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, Option[A]] {
-      override def decode(a: Try[aws.AttributeValue]): Try[Option[A]] = {
-        d.decode(a).map(Some.apply).recoverWith {
-          case _: NoSuchElementException =>
-            Success(None)
-          case e =>
-            Failure(e)
-        }
-      }
-    }
   implicit def intAwsDecoder: SingleFieldEffectfulDecoder[Try,
                                                           aws.AttributeValue,
                                                           Int] =
