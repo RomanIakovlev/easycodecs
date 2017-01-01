@@ -6,7 +6,6 @@ import shapeless.labelled.{FieldType, field}
 
 import scala.language.higherKinds
 import scala.util.Try
-
 trait SingleFieldDecoder[A] {
   def decode(attributeValue: Option[AttributeValue]): Option[A]
 }
@@ -74,7 +73,8 @@ object SingleFieldDecoder {
       println("big decimal decoder")
       attributeValue match {
         case Some(AttributeValueBigDecimal(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) => Try(BigDecimal(value)).toOption
+        case Some(AttributeValueNumeric(value)) =>
+          Try(BigDecimal(value)).toOption
         case _ => None
       }
     }
@@ -101,14 +101,14 @@ object SingleFieldDecoder {
         }
       }
     }
-  implicit def mapAsClassDecoder[A](implicit dm: MapDecoder[A],
+  implicit def mapAsClassDecoder[A](implicit dm: Decoder[A],
                                     t: Typeable[A]) =
     new SingleFieldDecoder[A] {
       override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
         println("map decoder " + t.describe)
         attributeValue match {
           case Some(AttributeValueMap(value)) =>
-            dm.decode(AttributeValueMap(value))
+            dm.decode(value)
           case _ => None
         }
       }
@@ -211,41 +211,6 @@ object CoproductDecoder {
       d: CoproductDecoder[R]) = new CoproductDecoder[A] {
     override def decode(a: Option[AttributeValue]): Option[A] = {
       d.decode(a).map(lg.from)
-    }
-  }
-}
-
-trait MapDecoder[A] {
-  def decode(map: AttributeValueMap): Option[A]
-}
-
-object MapDecoder {
-  implicit def hNilMapDecoder = new MapDecoder[HNil] {
-    override def decode(map: AttributeValueMap): Option[HNil] =
-      Some(HNil)
-  }
-
-  implicit def hConsMapDecoder[K <: Symbol, H, T <: HList](
-      implicit k: Witness.Aux[K],
-      d: SingleFieldDecoder[H],
-      td: MapDecoder[T],
-      t: Typeable[H]) = new MapDecoder[FieldType[K, H] :: T] {
-    override def decode(map: AttributeValueMap): Option[FieldType[K, H] :: T] = {
-      println("hcons map decoder " + t.describe)
-      val attrValue = map.value.get(k.value.name)
-      for {
-        decoded <- d.decode(attrValue)
-        tail <- td.decode(map)
-      } yield field[K](decoded) :: tail
-    }
-  }
-
-  implicit def caseClassDecoder[A, R](implicit lg: LabelledGeneric.Aux[A, R],
-                                      dr: MapDecoder[R],
-                                      t: Typeable[A]) = new MapDecoder[A] {
-    override def decode(map: AttributeValueMap): Option[A] = {
-      println("case class map decoder " + t.describe)
-      dr.decode(map).map(lg.from)
     }
   }
 }
