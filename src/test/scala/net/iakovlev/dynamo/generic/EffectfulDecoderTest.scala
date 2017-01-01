@@ -8,7 +8,7 @@ import scala.util.{Failure, Success, Try}
 
 //import scala.language.implicitConversions
 
-class EffectfulDecoderTest extends Specification {
+/*class EffectfulDecoderTest extends Specification {
   "Monadic decoder should" >> {
     "decode simple case class" >> {
       case class Inner(j: String)
@@ -38,4 +38,4 @@ class EffectfulDecoderTest extends Specification {
       d must_== Success(Outer(Simple(123, Inner("hello"))))
     }
   }
-}
+}*/

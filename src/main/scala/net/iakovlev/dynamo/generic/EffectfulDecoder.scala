@@ -1,6 +1,6 @@
 package net.iakovlev.dynamo.generic
 import cats.implicits._
-import cats.{ApplicativeError, Monad}
+import cats.{ApplicativeError, Monad, MonadError}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
@@ -26,6 +26,23 @@ object SingleFieldEffectfulDecoder {
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] =
         d.value.decode(a)
+    }
+  implicit def decodeEnum[F[_], S, E >: Throwable, A, C <: Coproduct](
+      implicit f: MonadError[F, E],
+      gen: LabelledGeneric.Aux[A, C],
+      ds: SingleFieldEffectfulDecoder[F, S, String],
+      rie: IsEnum[C]) =
+    new SingleFieldEffectfulDecoder[F, S, A] {
+      override def decode(a: F[S]): F[A] = {
+        ds.decode(a)
+          .flatMap(
+            s =>
+              rie
+                .from(s)
+                .map(gen.from)
+                .map(v => f.pure(v))
+                .getOrElse(f.raiseError(new NoSuchElementException)))
+      }
     }
 }
 

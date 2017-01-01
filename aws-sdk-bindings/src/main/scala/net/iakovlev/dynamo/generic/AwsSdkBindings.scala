@@ -92,21 +92,6 @@ trait AwsAttributeValueDecoder {
         })
       }
     }
-  /*implicit def coproductAsClassDecoder[A](
-      implicit d: Lazy[CoproductEffectfulDecoder[Try, aws.AttributeValue, A]],
-      lp: LowPriority) =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A] {
-      override def decode(a: Try[aws.AttributeValue]): Try[A] =
-        d.value.decode(a)
-    }*/
-
-  implicit def decodeEnum[A, C <: Coproduct](
-      implicit gen: LabelledGeneric.Aux[A, C],
-      ds: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, String],
-      rie: IsEnum[C]) = new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A] {
-    override def decode(a: Try[aws.AttributeValue]): Try[A] =
-      ds.decode(a).flatMap(s => rie.from(s).map(gen.from).map(v => Success(v)).getOrElse(Failure(new NoSuchElementException)))
-  }
 }
 
 trait AwsSdkBindings {
