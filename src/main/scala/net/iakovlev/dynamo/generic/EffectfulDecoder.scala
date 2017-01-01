@@ -1,6 +1,6 @@
 package net.iakovlev.dynamo.generic
 import cats.implicits._
-import cats.{ApplicativeError, Monad, MonadError}
+import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
@@ -8,7 +8,7 @@ import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 trait PrimitivesExtractor[F[_], A, B] {
-  implicit def extract(a: A): F[B]
+  def extract(a: A): F[B]
 }
 
 trait SingleFieldEffectfulDecoder[F[_], A, B] {
@@ -24,6 +24,14 @@ object SingleFieldEffectfulDecoder {
         d.value.decode(ev.value(a))
       }
     }*/
+  implicit def extractorDecoder[F[_], S, A](
+      implicit f: Monad[F],
+      ext: PrimitivesExtractor[F, S, A])
+    : SingleFieldEffectfulDecoder[F, S, A] =
+    new SingleFieldEffectfulDecoder[F, S, A] {
+      override def decode(a: F[S]): F[A] =
+        a.flatMap(aa => ext.extract(aa))
+    }
   implicit def optionalDecoder[F[_], S, E >: Throwable, A](
       implicit f: ApplicativeError[F, E],
       d: SingleFieldEffectfulDecoder[F, S, A])
@@ -98,12 +106,12 @@ object EffectfulDecoder {
   implicit def caseClassDecoder[F[_], A, B, E, R](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
-      dr: EffectfulDecoder[F, A, R],
+      dr: Lazy[EffectfulDecoder[F, A, R]],
       t: Typeable[B]) =
     new EffectfulDecoder[F, A, B] {
       override def decode(attributes: Map[String, A]): F[B] = {
         println("case class decoder " + t.describe)
-        dr.decode(attributes).map(lg.from)
+        dr.value.decode(attributes).map(lg.from)
       }
     }
 
@@ -123,7 +131,7 @@ object CoproductEffectfulDecoder {
     : CoproductEffectfulDecoder[F, A, CNil] =
     new CoproductEffectfulDecoder[F, A, CNil] {
       override def decode(a: F[A]): F[CNil] =
-        f.fromTry[CNil](Failure(new Exception))
+        f.fromTry[CNil](Failure(new Exception("CNil decoder!")))
     }
 
   implicit def coproductDecoder[F[_], A, E, K <: Symbol, H, T <: Coproduct](
