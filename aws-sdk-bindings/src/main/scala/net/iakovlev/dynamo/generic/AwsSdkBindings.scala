@@ -8,61 +8,100 @@ import scala.util.{Success, Try}
 import cats.implicits._
 import shapeless.Lazy
 
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable
+import scala.language.higherKinds
+
 trait AwsAttributeValueDecoder {
 
-  implicit def intAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, Int] =
+  implicit def intAwsExtractor: PrimitivesExtractor[Try,
+                                                    aws.AttributeValue,
+                                                    Int] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Int] {
       override def extract(a: aws.AttributeValue): Try[Int] = {
         Try(a.getN.toInt)
       }
     }
 
-  implicit def longAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, Long] =
+  implicit def longAwsExtractor: PrimitivesExtractor[Try,
+                                                     aws.AttributeValue,
+                                                     Long] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Long] {
       override def extract(a: aws.AttributeValue): Try[Long] = {
         Try(a.getN.toLong)
       }
     }
 
-  implicit def booleanAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, Boolean] =
+  implicit def booleanAwsExtractor: PrimitivesExtractor[Try,
+                                                        aws.AttributeValue,
+                                                        Boolean] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Boolean] {
       override def extract(a: aws.AttributeValue): Try[Boolean] = {
         Try(a.getBOOL)
       }
     }
 
-  implicit def floatAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, Float] =
+  implicit def floatAwsExtractor: PrimitivesExtractor[Try,
+                                                      aws.AttributeValue,
+                                                      Float] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Float] {
       override def extract(a: aws.AttributeValue): Try[Float] = {
         Try(a.getN.toFloat)
       }
     }
 
-  implicit def doubleAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, Double] =
+  implicit def doubleAwsExtractor: PrimitivesExtractor[Try,
+                                                       aws.AttributeValue,
+                                                       Double] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Double] {
       override def extract(a: aws.AttributeValue): Try[Double] = {
         Try(a.getN.toDouble)
       }
     }
 
-  implicit def bigDecimalAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, BigDecimal] =
+  implicit def bigDecimalAwsExtractor: PrimitivesExtractor[Try,
+                                                           aws.AttributeValue,
+                                                           BigDecimal] =
     new PrimitivesExtractor[Try, aws.AttributeValue, BigDecimal] {
       override def extract(a: aws.AttributeValue): Try[BigDecimal] = {
         Try(BigDecimal(a.getN))
       }
     }
-  implicit def stringAwsExtractor: PrimitivesExtractor[Try, aws.AttributeValue, String] =
+  implicit def stringAwsExtractor: PrimitivesExtractor[Try,
+                                                       aws.AttributeValue,
+                                                       String] =
     new PrimitivesExtractor[Try, aws.AttributeValue, String] {
       override def extract(a: aws.AttributeValue): Try[String] = {
         Try(a.getS)
       }
     }
-  implicit def listAwsDecoder[A](
-      implicit ad: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A])
-    : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, List[A]] =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, List[A]] {
-      override def decode(a: Try[aws.AttributeValue]): Try[List[A]] = {
-        a.flatMap(_.getL.asScala.toList.map(b => Try(b)).traverse(ad.decode))
+
+/*
+  implicit def listExtractor[AA >: aws.AttributeValue,
+                             A <: aws.AttributeValue,
+                             C[_] <: TraversableOnce[A]](
+      implicit cbf: CanBuildFrom[C[AA], AA, C[A]])
+    : PrimitivesExtractor[Try, A, C[A]] =
+    new PrimitivesExtractor[Try, A, C[A]] {
+      override def extract(a: A): Try[C[A]] = {
+        val r = cbf()
+        val rr = Try(a.getL.asScala.foreach(aa => r += aa))
+        rr.map(_ => r.result())
+      }
+    }
+*/
+
+  implicit def listAwsDecoder[A, C[_] <: TraversableOnce[A]](
+      implicit cbf: CanBuildFrom[List[A], A, C[A]],
+      ad: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A])
+    : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, C[A]] =
+    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, C[A]] {
+      override def decode(a: Try[aws.AttributeValue]): Try[C[A]] = {
+        val c = cbf()
+        val r =
+          a.flatMap(_.getL.asScala.toList.map(b => Try(b)).traverse(ad.decode))
+        r.map(_.foreach(e => c += e))
+        Try(c.result())
       }
     }
   implicit def mapAsClassAwsDecoder[A](

@@ -4,8 +4,13 @@ import cats.{Applicative, ApplicativeError, Monad, MonadError}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
+import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
+
+trait CollectionsExtractor[F[_], C[_], A, B] {
+  def extract(c: A): C[F[B]]
+}
 
 trait PrimitivesExtractor[F[_], A, B] {
   def extract(a: A): F[B]
@@ -24,9 +29,34 @@ object SingleFieldEffectfulDecoder {
         d.value.decode(ev.value(a))
       }
     }*/
-  implicit def extractorDecoder[F[_], S, A](
-      implicit f: Monad[F],
-      ext: PrimitivesExtractor[F, S, A])
+  implicit def collectionsExtractorDecoder[F[_],
+                                           S,
+                                           SA,
+                                           A,
+                                           CSA[_] <: TraversableOnce[F[SA]], C[_] <: TraversableOnce[F[A]]](
+      implicit cbf: CanBuildFrom[C[A], A, C[A]],
+      f: Monad[F],
+      ext: PrimitivesExtractor[F, S, CSA[F[SA]]],
+      d: SingleFieldEffectfulDecoder[F, SA, A])
+    : SingleFieldEffectfulDecoder[F, S, C[A]] =
+    new SingleFieldEffectfulDecoder[F, S, C[A]] {
+      override def decode(a: F[S]): F[C[A]] = {
+        val r = for {
+          aa <- a
+          aaa <- ext.extract(aa)
+          rr <- aaa.foldLeft(f.pure(cbf()))((facc, elem) => {
+            for {
+              p <- d.decode(elem)
+              acc <- facc
+            } yield acc += p
+          })
+        } yield rr.result()
+        //val r = a.flatMap(aa => ext.extract(aa).flatMap(aaa => aaa.map((c: F[SA]) => d.decode(c))))
+        r
+      }
+    }
+  implicit def extractorDecoder[F[_], S, A](implicit f: Monad[F],
+                                            ext: PrimitivesExtractor[F, S, A])
     : SingleFieldEffectfulDecoder[F, S, A] =
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] =
