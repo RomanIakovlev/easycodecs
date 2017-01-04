@@ -22,8 +22,10 @@ trait SingleFieldEffectfulDecoder[F[_], A, B] {
 }
 
 object SingleFieldEffectfulDecoder {
-
-  implicit def traversableExtractorDecoder[F[_], S, A, C[A] <: TraversableLike[A, C[A]]](
+  implicit def traversableExtractorDecoder[F[_],
+                                           S,
+                                           A,
+                                           C[X] <: TraversableOnce[X]](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       f: Monad[F],
       t: Traverse[C],
@@ -34,11 +36,13 @@ object SingleFieldEffectfulDecoder {
       override def decode(a: F[S]): F[C[A]] = {
         val c = cbf()
         val r =
-          a.flatMap(s => ext.extract(s).flatMap(cfs => cfs.traverse(ad.decode)))
+          a.flatMap(s =>
+            ext.extract(s).flatMap(cfs => cfs.traverse(ad.decode)))
         r.map(_.foreach(e => c += e))
         r.map(_ => c.result())
       }
     }
+
   implicit def extractorDecoder[F[_], S, A](implicit f: Monad[F],
                                             ext: PrimitivesExtractor[F, S, A])
     : SingleFieldEffectfulDecoder[F, S, A] =
@@ -61,11 +65,11 @@ object SingleFieldEffectfulDecoder {
       }
     }
   implicit def coproductAsClassDecoder[F[_], S, A](
-      implicit d: CoproductEffectfulDecoder[F, S, A],
+      implicit d: Lazy[CoproductEffectfulDecoder[F, S, A]],
       lp: LowPriority) =
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] =
-        d.decode(a)
+        d.value.decode(a)
     }
   implicit def decodeEnum[F[_], S, E >: Throwable, A, C <: Coproduct](
       implicit f: MonadError[F, E],
@@ -151,11 +155,9 @@ object CoproductEffectfulDecoder {
   implicit def coproductDecoder[F[_], A, E, K <: Symbol, H, T <: Coproduct](
       implicit f: ApplicativeError[F, E],
       dh: SingleFieldEffectfulDecoder[F, A, H],
-      dt: SingleFieldEffectfulDecoder[F, A, T],
-      t: Typeable[H]) =
+      dt: SingleFieldEffectfulDecoder[F, A, T]) =
     new CoproductEffectfulDecoder[F, A, FieldType[K, H] :+: T] {
       override def decode(a: F[A]): F[FieldType[K, H] :+: T] = {
-        println("coproduct decoder " + t.describe)
         val r = dh
           .decode(a)
           .map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T)
@@ -165,7 +167,7 @@ object CoproductEffectfulDecoder {
         }
       }
     }
-  implicit def coproductDecoder[F[_], A, B, E >: Throwable, R <: Coproduct](
+  implicit def genericDecoder[F[_], A, B, E >: Throwable, R <: Coproduct](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
       d: CoproductEffectfulDecoder[F, A, R]) =

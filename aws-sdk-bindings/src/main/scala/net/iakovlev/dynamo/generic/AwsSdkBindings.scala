@@ -75,7 +75,6 @@ trait AwsAttributeValueDecoder {
         Try(a.getS)
       }
     }
-
   implicit def traversableExtractor[C[X] <: TraversableOnce[X]](
       implicit cbf: CanBuildFrom[C[Try[aws.AttributeValue]],
                                  Try[aws.AttributeValue],
