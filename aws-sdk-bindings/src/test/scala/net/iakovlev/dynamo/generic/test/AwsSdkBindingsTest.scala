@@ -54,6 +54,29 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
 
       res must_== Success(Parent(Vector(Child("bla"))))
     }
+    "Decode all supported collections" >> {
+      //only collections with instances of cats.Traverse are supported
+      case class Child(s: String)
+      case class ListParent(
+          l: List[Child],
+          v: Vector[Child]
+      )
+      val c = new aws.AttributeValue()
+        .withL(new aws.AttributeValue()
+          .addMEntry("s", new aws.AttributeValue("bla")))
+      val child = Child("bla")
+      val res = EffectfulDecoder[aws.AttributeValue, ListParent](
+        Map(
+          "l" -> c,
+          "v" -> c
+        )
+      )
+      res must_== Success(
+        ListParent(
+          List(child),
+          Vector(child)
+        ))
+    }
     "Decode scalar lists" >> {
       case class Parent(c: List[String])
       val res = EffectfulDecoder[aws.AttributeValue, Parent](

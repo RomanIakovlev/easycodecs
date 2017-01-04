@@ -1,17 +1,12 @@
 package net.iakovlev.dynamo.generic
 import cats.implicits._
-import cats.{Applicative, ApplicativeError, Monad, MonadError, Traverse}
+import cats.{ApplicativeError, Monad, MonadError, Traverse}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
-import scala.collection.TraversableLike
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.{Failure, Success, Try}
-
-trait CollectionsExtractor[F[_], C[_], A, B] {
-  def extract(c: A): C[F[B]]
-}
+import scala.util.{Failure, Try}
 
 trait PrimitivesExtractor[F[_], A, B] {
   def extract(a: A): F[B]
@@ -22,24 +17,25 @@ trait SingleFieldEffectfulDecoder[F[_], A, B] {
 }
 
 object SingleFieldEffectfulDecoder {
-  implicit def traversableExtractorDecoder[F[_],
+  implicit def traversableExtractorDecoder[F[_] : Monad,
                                            S,
                                            A,
-                                           C[X] <: TraversableOnce[X]](
+                                           C[X] <: TraversableOnce[X] : Traverse](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
-      f: Monad[F],
-      t: Traverse[C],
       ad: SingleFieldEffectfulDecoder[F, S, A],
       ext: PrimitivesExtractor[F, S, C[F[S]]])
     : SingleFieldEffectfulDecoder[F, S, C[A]] =
     new SingleFieldEffectfulDecoder[F, S, C[A]] {
       override def decode(a: F[S]): F[C[A]] = {
-        val c = cbf()
-        val r =
-          a.flatMap(s =>
-            ext.extract(s).flatMap(cfs => cfs.traverse(ad.decode)))
-        r.map(_.foreach(e => c += e))
-        r.map(_ => c.result())
+        val builder = cbf()
+        for {
+          s <- a
+          cfs <- ext.extract(s)
+          r <- cfs.traverse(ad.decode)
+        } yield {
+          r.foreach(builder += _)
+          builder.result()
+        }
       }
     }
 
