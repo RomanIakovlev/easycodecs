@@ -1,10 +1,11 @@
 scalaOrganization in ThisBuild := "org.typelevel"
-
+resolvers in ThisBuild += Resolver.bintrayRepo("tek", "maven")
 val commonSettings =
   Seq(organization := "net.iakovlev",
       scalaVersion := "2.11.8",
       scalacOptions in Test ++= Seq("-Yrangepos"),
-      libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.6" % "test"))
+      libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.6" % "test",
+        compilerPlugin("tryp" %% "splain" % "0.1.11")))
 
 lazy val core = (project in file("."))
   .settings(commonSettings)

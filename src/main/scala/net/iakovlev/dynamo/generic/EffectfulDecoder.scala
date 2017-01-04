@@ -1,9 +1,10 @@
 package net.iakovlev.dynamo.generic
 import cats.implicits._
-import cats.{Applicative, ApplicativeError, Monad, MonadError}
+import cats.{Applicative, ApplicativeError, Monad, MonadError, Traverse}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
+import scala.collection.TraversableLike
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
@@ -21,38 +22,21 @@ trait SingleFieldEffectfulDecoder[F[_], A, B] {
 }
 
 object SingleFieldEffectfulDecoder {
-  /*implicit def mapAsClassAwsDecoder[F[_], S, A](
-      implicit d: Lazy[EffectfulDecoder[F, S, A]],
-      ev: Lazy[(S) => Map[String, S]]): SingleFieldEffectfulDecoder[F, S, A] =
-    new SingleFieldEffectfulDecoder[F, S, A] {
-      override def decode(a: S): F[A] = {
-        d.value.decode(ev.value(a))
-      }
-    }*/
-  implicit def collectionsExtractorDecoder[F[_],
-                                           S,
-                                           SA,
-                                           A,
-                                           CSA[_] <: TraversableOnce[F[SA]], C[_] <: TraversableOnce[F[A]]](
+
+  implicit def traversableExtractorDecoder[F[_], S, A, C[A] <: TraversableLike[A, C[A]]](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       f: Monad[F],
-      ext: PrimitivesExtractor[F, S, CSA[F[SA]]],
-      d: SingleFieldEffectfulDecoder[F, SA, A])
+      t: Traverse[C],
+      ad: SingleFieldEffectfulDecoder[F, S, A],
+      ext: PrimitivesExtractor[F, S, C[F[S]]])
     : SingleFieldEffectfulDecoder[F, S, C[A]] =
     new SingleFieldEffectfulDecoder[F, S, C[A]] {
       override def decode(a: F[S]): F[C[A]] = {
-        val r = for {
-          aa <- a
-          aaa <- ext.extract(aa)
-          rr <- aaa.foldLeft(f.pure(cbf()))((facc, elem) => {
-            for {
-              p <- d.decode(elem)
-              acc <- facc
-            } yield acc += p
-          })
-        } yield rr.result()
-        //val r = a.flatMap(aa => ext.extract(aa).flatMap(aaa => aaa.map((c: F[SA]) => d.decode(c))))
-        r
+        val c = cbf()
+        val r =
+          a.flatMap(s => ext.extract(s).flatMap(cfs => cfs.traverse(ad.decode)))
+        r.map(_.foreach(e => c += e))
+        r.map(_ => c.result())
       }
     }
   implicit def extractorDecoder[F[_], S, A](implicit f: Monad[F],
@@ -77,11 +61,11 @@ object SingleFieldEffectfulDecoder {
       }
     }
   implicit def coproductAsClassDecoder[F[_], S, A](
-      implicit d: Lazy[CoproductEffectfulDecoder[F, S, A]],
+      implicit d: CoproductEffectfulDecoder[F, S, A],
       lp: LowPriority) =
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] =
-        d.value.decode(a)
+        d.decode(a)
     }
   implicit def decodeEnum[F[_], S, E >: Throwable, A, C <: Coproduct](
       implicit f: MonadError[F, E],
@@ -167,9 +151,11 @@ object CoproductEffectfulDecoder {
   implicit def coproductDecoder[F[_], A, E, K <: Symbol, H, T <: Coproduct](
       implicit f: ApplicativeError[F, E],
       dh: SingleFieldEffectfulDecoder[F, A, H],
-      dt: SingleFieldEffectfulDecoder[F, A, T]) =
+      dt: SingleFieldEffectfulDecoder[F, A, T],
+      t: Typeable[H]) =
     new CoproductEffectfulDecoder[F, A, FieldType[K, H] :+: T] {
       override def decode(a: F[A]): F[FieldType[K, H] :+: T] = {
+        println("coproduct decoder " + t.describe)
         val r = dh
           .decode(a)
           .map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T)
@@ -179,7 +165,7 @@ object CoproductEffectfulDecoder {
         }
       }
     }
-  implicit def genericDecoder[F[_], A, B, E >: Throwable, R <: Coproduct](
+  implicit def coproductDecoder[F[_], A, B, E >: Throwable, R <: Coproduct](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
       d: CoproductEffectfulDecoder[F, A, R]) =

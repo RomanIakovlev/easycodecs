@@ -8,8 +8,8 @@ import scala.util.{Success, Try}
 import cats.implicits._
 import shapeless.Lazy
 
-import scala.collection.generic.CanBuildFrom
-import scala.collection.mutable
+import scala.collection.generic._
+import scala.collection.{TraversableLike, mutable}
 import scala.language.higherKinds
 
 trait AwsAttributeValueDecoder {
@@ -76,34 +76,22 @@ trait AwsAttributeValueDecoder {
       }
     }
 
-/*
-  implicit def listExtractor[AA >: aws.AttributeValue,
-                             A <: aws.AttributeValue,
-                             C[_] <: TraversableOnce[A]](
-      implicit cbf: CanBuildFrom[C[AA], AA, C[A]])
-    : PrimitivesExtractor[Try, A, C[A]] =
-    new PrimitivesExtractor[Try, A, C[A]] {
-      override def extract(a: A): Try[C[A]] = {
-        val r = cbf()
-        val rr = Try(a.getL.asScala.foreach(aa => r += aa))
-        rr.map(_ => r.result())
-      }
-    }
-*/
-
-  implicit def listAwsDecoder[A, C[_] <: TraversableOnce[A]](
-      implicit cbf: CanBuildFrom[List[A], A, C[A]],
-      ad: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A])
-    : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, C[A]] =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, C[A]] {
-      override def decode(a: Try[aws.AttributeValue]): Try[C[A]] = {
+  implicit def traversableExtractor[C[X] <: TraversableOnce[X]](
+      implicit cbf: CanBuildFrom[C[Try[aws.AttributeValue]],
+                                 Try[aws.AttributeValue],
+                                 C[Try[aws.AttributeValue]]]
+  ): PrimitivesExtractor[Try, aws.AttributeValue, C[Try[aws.AttributeValue]]] =
+    new PrimitivesExtractor[Try,
+                            aws.AttributeValue,
+                            C[Try[aws.AttributeValue]]] {
+      override def extract(
+          a: aws.AttributeValue): Try[C[Try[aws.AttributeValue]]] = {
         val c = cbf()
-        val r =
-          a.flatMap(_.getL.asScala.toList.map(b => Try(b)).traverse(ad.decode))
-        r.map(_.foreach(e => c += e))
+        a.getL.asScala.map(Try(_)).foreach(r => c += r)
         Try(c.result())
       }
     }
+
   implicit def mapAsClassAwsDecoder[A](
       implicit d: EffectfulDecoder[Try, aws.AttributeValue, A])
     : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A] =

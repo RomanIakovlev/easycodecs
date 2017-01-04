@@ -8,12 +8,13 @@ import com.amazonaws.services.dynamodbv2.model._
 import cats.implicits._
 
 import scala.collection.JavaConverters._
+import scala.collection.generic.CanBuildFrom
 import scala.util.{Failure, Success, Try}
 
 class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
   type AwsDecoder[A] = EffectfulDecoder[Try, aws.AttributeValue, A]
   "AWS bindings for generic effectful decoder derivation facility should" >> {
-    /*"Use custom decoder" >> {
+    "Use custom decoder" >> {
       case class Test(s: List[Int])
       val d = new AwsDecoder[Test] {
         override def decode(
@@ -41,19 +42,19 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
                          .addMEntry("s", new aws.AttributeValue("lol")))
         ))
       res must_== Success(Parent("hello", Custom(Child("lol"), "world")))
-    }*/
+    }
     "Decode case classes lists" >> {
       case class Child(s: String)
-      case class Parent(c: List[Child])
+      case class Parent(c: Vector[Child])
       val res = EffectfulDecoder[aws.AttributeValue, Parent](
         Map(
           "c" -> new aws.AttributeValue()
             .withL(new aws.AttributeValue()
               .addMEntry("s", new aws.AttributeValue("bla")))))
 
-      res must_== Success(Parent(List(Child("bla"))))
+      res must_== Success(Parent(Vector(Child("bla"))))
     }
-    /*"Decode scalar lists" >> {
+    "Decode scalar lists" >> {
       case class Parent(c: List[String])
       val res = EffectfulDecoder[aws.AttributeValue, Parent](
         Map(
@@ -121,6 +122,6 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
           Map("a" -> new aws.AttributeValue("A"),
               "b" -> new aws.AttributeValue("B")))
       res must_== Success(O(A, B))
-    }*/
+    }
   }
 }
