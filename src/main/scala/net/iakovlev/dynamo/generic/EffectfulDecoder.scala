@@ -17,10 +17,36 @@ trait SingleFieldEffectfulDecoder[F[_], A, B] {
 }
 
 object SingleFieldEffectfulDecoder {
-  implicit def traversableExtractorDecoder[F[_] : Monad,
+  implicit def mapAsClassDecoder[F[_]: Monad, S, A](
+      implicit d: EffectfulDecoder[F, S, A],
+      ext: PrimitivesExtractor[F, S, Map[String, S]])
+    : SingleFieldEffectfulDecoder[F, S, A] =
+    new SingleFieldEffectfulDecoder[F, S, A] {
+      override def decode(a: F[S]): F[A] = {
+        for {
+          b <- a
+          c <- ext.extract(b)
+          d <- d.decode(c)
+        } yield d
+      }
+    }
+  implicit def mapAsMapDecoder[F[_], S, A](
+      implicit f: Monad[F],
+      d: SingleFieldEffectfulDecoder[F, S, A],
+      ext: PrimitivesExtractor[F, S, Map[String, S]])
+    : SingleFieldEffectfulDecoder[F, S, Map[String, F[A]]] =
+    new SingleFieldEffectfulDecoder[F, S, Map[String, F[A]]] {
+      override def decode(a: F[S]): F[Map[String, F[A]]] = {
+        for {
+          b <- a
+          c <- ext.extract(b)
+        } yield c.mapValues(value => d.decode(f.pure(value)))
+      }
+    }
+  implicit def traversableExtractorDecoder[F[_]: Monad,
                                            S,
                                            A,
-                                           C[X] <: TraversableOnce[X] : Traverse](
+                                           C[X] <: Seq[X]: Traverse](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       ad: SingleFieldEffectfulDecoder[F, S, A],
       ext: PrimitivesExtractor[F, S, C[F[S]]])
@@ -106,12 +132,10 @@ object EffectfulDecoder {
       implicit f: ApplicativeError[F, E],
       k: Witness.Aux[K],
       d: SingleFieldEffectfulDecoder[F, A, H],
-      dt: EffectfulDecoder[F, A, T],
-      t: Typeable[H]) =
+      dt: EffectfulDecoder[F, A, T]) =
     new EffectfulDecoder[F, A, FieldType[K, H] :: T] {
       override def decode(
           attributes: Map[String, A]): F[FieldType[K, H] :: T] = {
-        println("hcons decoder " + t.describe)
         val a = f.catchNonFatal(attributes(k.value.name))
         (d.decode(a) |@| dt.decode(attributes)).map { field[K](_) :: _ }
       }
@@ -120,11 +144,9 @@ object EffectfulDecoder {
   implicit def caseClassDecoder[F[_], A, B, E, R](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
-      dr: Lazy[EffectfulDecoder[F, A, R]],
-      t: Typeable[B]) =
+      dr: Lazy[EffectfulDecoder[F, A, R]]) =
     new EffectfulDecoder[F, A, B] {
       override def decode(attributes: Map[String, A]): F[B] = {
-        println("case class decoder " + t.describe)
         dr.value.decode(attributes).map(lg.from)
       }
     }

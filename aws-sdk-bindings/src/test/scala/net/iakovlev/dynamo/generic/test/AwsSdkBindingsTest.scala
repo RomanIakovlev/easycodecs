@@ -95,16 +95,17 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
       res2 must_== Success(Optional(None))
     }
     "Decode map field as a simple map, not nested class" >> {
-      case class MapHostString(m: Map[String, String])
+      // TODO has to be Map[String, F[_]], because of lack of Optional type class in Cats
+      case class MapHostString(m: Map[String, Try[String]])
       val res = EffectfulDecoder[aws.AttributeValue, MapHostString](
         Map("m" -> new aws.AttributeValue()
           .addMEntry("hello", new aws.AttributeValue("world"))))
-      res must_== Success(MapHostString(Map("hello" -> "world")))
-      case class MapHostInt(m: Map[String, Int])
+      res must_== Success(MapHostString(Map("hello" -> Success("world"))))
+      case class MapHostInt(m: Map[String, Try[Int]])
       val res1 = EffectfulDecoder[aws.AttributeValue, MapHostInt](
         Map("m" -> new aws.AttributeValue()
           .addMEntry("hello", new aws.AttributeValue().withN("123"))))
-      res1 must_== Success(MapHostInt(Map("hello" -> 123)))
+      res1 must_== Success(MapHostInt(Map("hello" -> Success(123))))
     }
     "Decode all numeric attributes correctly" >> {
       case class AllNumerals(i: Int,

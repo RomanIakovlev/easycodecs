@@ -1,16 +1,12 @@
 package net.iakovlev.dynamo.generic
 
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, GetItemResult}
+import com.amazonaws.services.dynamodbv2.model.GetItemResult
 import com.amazonaws.services.dynamodbv2.{model => aws}
 
 import scala.collection.JavaConverters._
-import scala.util.{Success, Try}
-import cats.implicits._
-import shapeless.Lazy
-
 import scala.collection.generic._
-import scala.collection.{TraversableLike, mutable}
 import scala.language.higherKinds
+import scala.util.Try
 
 trait AwsAttributeValueDecoder {
 
@@ -72,10 +68,10 @@ trait AwsAttributeValueDecoder {
                                                        String] =
     new PrimitivesExtractor[Try, aws.AttributeValue, String] {
       override def extract(a: aws.AttributeValue): Try[String] = {
-        Try(a.getS)
+        Try(Option(a.getS).get)
       }
     }
-  implicit def traversableExtractor[C[X] <: TraversableOnce[X]](
+  implicit def seqExtractor[C[X] <: Seq[X]](
       implicit cbf: CanBuildFrom[C[Try[aws.AttributeValue]],
                                  Try[aws.AttributeValue],
                                  C[Try[aws.AttributeValue]]]
@@ -85,27 +81,26 @@ trait AwsAttributeValueDecoder {
                             C[Try[aws.AttributeValue]]] {
       override def extract(
           a: aws.AttributeValue): Try[C[Try[aws.AttributeValue]]] = {
-        val c = cbf()
-        a.getL.asScala.map(Try(_)).foreach(r => c += r)
-        Try(c.result())
+        for {
+          c <- Try(cbf())
+          r = a.getL.asScala.map(Try(_))
+        } yield {
+          r.foreach(c += _)
+          c.result()
+        }
       }
     }
 
-  implicit def mapAsClassAwsDecoder[A](
-      implicit d: EffectfulDecoder[Try, aws.AttributeValue, A])
-    : SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A] =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A] {
-      override def decode(a: Try[aws.AttributeValue]): Try[A] = {
-        a.flatMap(attr => d.decode(attr.getM.asScala.toMap))
-      }
-    }
-  implicit def mapAsMapAwsDecoder[A](
-      implicit d: SingleFieldEffectfulDecoder[Try, aws.AttributeValue, A]) =
-    new SingleFieldEffectfulDecoder[Try, aws.AttributeValue, Map[String, A]] {
-      override def decode(a: Try[aws.AttributeValue]): Try[Map[String, A]] = {
-        a.map(_.getM.asScala.toMap.mapValues(v => d.decode(Try(v))).collect {
-          case (k, Success(v)) => k -> v
-        })
+  implicit def mapExtractor: PrimitivesExtractor[
+    Try,
+    aws.AttributeValue,
+    Map[String, aws.AttributeValue]] =
+    new PrimitivesExtractor[Try,
+                            aws.AttributeValue,
+                            Map[String, aws.AttributeValue]] {
+      override def extract(
+          a: aws.AttributeValue): Try[Map[String, aws.AttributeValue]] = {
+        Try(a.getM.asScala.toMap)
       }
     }
 }
