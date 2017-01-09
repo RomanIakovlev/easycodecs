@@ -1,6 +1,6 @@
 package net.iakovlev.dynamo.generic
 
-import com.amazonaws.services.dynamodbv2.model.GetItemResult
+import com.amazonaws.services.dynamodbv2.model.{AttributeValue, GetItemResult}
 import com.amazonaws.services.dynamodbv2.{model => aws}
 
 import scala.collection.JavaConverters._
@@ -8,70 +8,66 @@ import scala.collection.generic._
 import scala.language.higherKinds
 import scala.util.Try
 
-trait AwsAttributeValueDecoder {
+trait AwsAttributeValueDecoder extends Extractors[Try, aws.AttributeValue] {
 
-  implicit def intAwsExtractor: PrimitivesExtractor[Try,
-                                                    aws.AttributeValue,
-                                                    Int] =
+  implicit def extractInt: PrimitivesExtractor[Try, aws.AttributeValue, Int] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Int] {
       override def extract(a: aws.AttributeValue): Try[Int] = {
         Try(a.getN.toInt)
       }
     }
 
-  implicit def longAwsExtractor: PrimitivesExtractor[Try,
-                                                     aws.AttributeValue,
-                                                     Long] =
+  implicit def extractLong: PrimitivesExtractor[Try, aws.AttributeValue, Long] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Long] {
       override def extract(a: aws.AttributeValue): Try[Long] = {
         Try(a.getN.toLong)
       }
     }
 
-  implicit def booleanAwsExtractor: PrimitivesExtractor[Try,
-                                                        aws.AttributeValue,
-                                                        Boolean] =
+  implicit def extractBoolean: PrimitivesExtractor[Try,
+                                                   aws.AttributeValue,
+                                                   Boolean] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Boolean] {
       override def extract(a: aws.AttributeValue): Try[Boolean] = {
         Try(a.getBOOL)
       }
     }
 
-  implicit def floatAwsExtractor: PrimitivesExtractor[Try,
-                                                      aws.AttributeValue,
-                                                      Float] =
+  implicit def extractFloat: PrimitivesExtractor[Try,
+                                                 aws.AttributeValue,
+                                                 Float] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Float] {
       override def extract(a: aws.AttributeValue): Try[Float] = {
         Try(a.getN.toFloat)
       }
     }
 
-  implicit def doubleAwsExtractor: PrimitivesExtractor[Try,
-                                                       aws.AttributeValue,
-                                                       Double] =
+  implicit def extractDouble: PrimitivesExtractor[Try,
+                                                  aws.AttributeValue,
+                                                  Double] =
     new PrimitivesExtractor[Try, aws.AttributeValue, Double] {
       override def extract(a: aws.AttributeValue): Try[Double] = {
         Try(a.getN.toDouble)
       }
     }
 
-  implicit def bigDecimalAwsExtractor: PrimitivesExtractor[Try,
-                                                           aws.AttributeValue,
-                                                           BigDecimal] =
+  implicit def extractBigDecimal: PrimitivesExtractor[Try,
+                                                      aws.AttributeValue,
+                                                      BigDecimal] =
     new PrimitivesExtractor[Try, aws.AttributeValue, BigDecimal] {
       override def extract(a: aws.AttributeValue): Try[BigDecimal] = {
         Try(BigDecimal(a.getN))
       }
     }
-  implicit def stringAwsExtractor: PrimitivesExtractor[Try,
-                                                       aws.AttributeValue,
-                                                       String] =
+  implicit def extractString: PrimitivesExtractor[Try,
+                                                  aws.AttributeValue,
+                                                  String] =
     new PrimitivesExtractor[Try, aws.AttributeValue, String] {
       override def extract(a: aws.AttributeValue): Try[String] = {
         Try(Option(a.getS).get)
       }
     }
-  implicit def seqExtractor[C[X] <: Seq[X]](
+  implicit def extractSeq[C[X] <: Seq[X]](
       implicit cbf: CanBuildFrom[C[Try[aws.AttributeValue]],
                                  Try[aws.AttributeValue],
                                  C[Try[aws.AttributeValue]]]
@@ -91,7 +87,7 @@ trait AwsAttributeValueDecoder {
       }
     }
 
-  implicit def mapExtractor: PrimitivesExtractor[
+  implicit def extractMap: PrimitivesExtractor[
     Try,
     aws.AttributeValue,
     Map[String, aws.AttributeValue]] =

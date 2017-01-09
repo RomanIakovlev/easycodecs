@@ -12,27 +12,32 @@ import scala.collection.generic.CanBuildFrom
 import scala.util.{Failure, Success, Try}
 
 class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
-  type AwsDecoder[A] = EffectfulDecoder[Try, aws.AttributeValue, A]
+  def awsDecoder[A](m: Map[String, aws.AttributeValue])(
+      implicit d: EffectfulDecoder[Try, aws.AttributeValue, A]) =
+    d.decode(m)
+  case class Test(s: List[Int])
+  object Test {
+    implicit val d = new EffectfulDecoder[Try, aws.AttributeValue, Test] {
+      override def decode(
+                           attributes: Map[String, aws.AttributeValue]): Try[Test] = {
+        for {
+          attrValue <- Try(attributes("s"))
+          value <- Try(attrValue.getS.split(",").map(_.toInt).toList)
+        } yield Test(value)
+      }
+    }
+  }
   "AWS bindings for generic effectful decoder derivation facility should" >> {
     "Use custom decoder" >> {
-      case class Test(s: List[Int])
-      val d = new AwsDecoder[Test] {
-        override def decode(
-            attributes: Map[String, aws.AttributeValue]): Try[Test] = {
-          for {
-            attrValue <- Try(attributes("s"))
-            value <- Try(attrValue.getS.split(",").map(_.toInt).toList)
-          } yield Test(value)
-        }
-      }
-      val res = d.decode(Map("s" -> new aws.AttributeValue().withS("1,2,3")))
+      // Class Test has to be defined outside of this spec, because specs2 breaks companion objects
+      val res = awsDecoder[Test](Map("s" -> new aws.AttributeValue().withS("1,2,3")))
       res must_== Success(Test(List(1, 2, 3)))
     }
     "Use map based decoder for nested classes" >> {
       case class Child(s: String)
       case class Custom(c: Child, s: String)
       case class Parent(s: String, c: Custom)
-      val res = EffectfulDecoder[aws.AttributeValue, Parent](
+      val res = awsDecoder[Parent](
         Map(
           "s" -> new aws.AttributeValue("hello"),
           "c" -> new aws.AttributeValue()
@@ -46,7 +51,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
     "Decode case classes lists" >> {
       case class Child(s: String)
       case class Parent(c: Vector[Child])
-      val res = EffectfulDecoder[aws.AttributeValue, Parent](
+      val res = awsDecoder[Parent](
         Map(
           "c" -> new aws.AttributeValue()
             .withL(new aws.AttributeValue()
@@ -65,7 +70,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
         .withL(new aws.AttributeValue()
           .addMEntry("s", new aws.AttributeValue("bla")))
       val child = Child("bla")
-      val res = EffectfulDecoder[aws.AttributeValue, ListParent](
+      val res = awsDecoder[ListParent](
         Map(
           "l" -> c,
           "v" -> c
@@ -79,7 +84,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
     }
     "Decode scalar lists" >> {
       case class Parent(c: List[String])
-      val res = EffectfulDecoder[aws.AttributeValue, Parent](
+      val res = awsDecoder[Parent](
         Map(
           "c" -> new aws.AttributeValue()
             .withL(List(new aws.AttributeValue("bla")).asJava))
@@ -88,21 +93,21 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
     }
     "Decode optional fields" >> {
       case class Optional(o: Option[String])
-      val res1 = EffectfulDecoder[aws.AttributeValue, Optional](
-        Map("o" -> new aws.AttributeValue("123")))
+      val res1 =
+        awsDecoder[Optional](Map("o" -> new aws.AttributeValue("123")))
       res1 must_== Success(Optional(Some("123")))
-      val res2 = EffectfulDecoder[aws.AttributeValue, Optional](Map())
+      val res2 = awsDecoder[Optional](Map())
       res2 must_== Success(Optional(None))
     }
     "Decode map field as a simple map, not nested class" >> {
       // TODO has to be Map[String, F[_]], because of lack of Optional type class in Cats
       case class MapHostString(m: Map[String, Try[String]])
-      val res = EffectfulDecoder[aws.AttributeValue, MapHostString](
+      val res = awsDecoder[MapHostString](
         Map("m" -> new aws.AttributeValue()
           .addMEntry("hello", new aws.AttributeValue("world"))))
       res must_== Success(MapHostString(Map("hello" -> Success("world"))))
       case class MapHostInt(m: Map[String, Try[Int]])
-      val res1 = EffectfulDecoder[aws.AttributeValue, MapHostInt](
+      val res1 = awsDecoder[MapHostInt](
         Map("m" -> new aws.AttributeValue()
           .addMEntry("hello", new aws.AttributeValue().withN("123"))))
       res1 must_== Success(MapHostInt(Map("hello" -> Success(123))))
@@ -114,7 +119,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
                              d: Double,
                              b: BigDecimal)
       val res =
-        EffectfulDecoder[aws.AttributeValue, AllNumerals](
+        awsDecoder[AllNumerals](
           Map(
             "i" -> new aws.AttributeValue().withN("1"),
             "l" -> new aws.AttributeValue().withN("2"),
@@ -129,7 +134,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
       case class A(a: String) extends ADT
       case class B(b: String) extends ADT
       case class O(a: ADT, b: ADT)
-      val res = EffectfulDecoder[aws.AttributeValue, O](
+      val res = awsDecoder[O](
         Map("a" -> new aws.AttributeValue()
               .addMEntry("a", new aws.AttributeValue("AAA")),
             "b" -> new aws.AttributeValue()
@@ -142,7 +147,7 @@ class AwsSdkBindingsTest extends Specification with AwsAttributeValueDecoder {
       case object B extends ADT
       case class O(a: ADT, b: ADT)
       val res =
-        EffectfulDecoder[aws.AttributeValue, O](
+        awsDecoder[O](
           Map("a" -> new aws.AttributeValue("A"),
               "b" -> new aws.AttributeValue("B")))
       res must_== Success(O(A, B))

@@ -6,7 +6,7 @@ import shapeless.labelled.{FieldType, field}
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.{Failure, Try}
+import scala.util.{Failure}
 
 trait PrimitivesExtractor[F[_], A, B] {
   def extract(a: A): F[B]
@@ -141,18 +141,20 @@ object EffectfulDecoder {
       }
     }
 
+  // LowPriority to allow for companion object-defined instances to take priority
   implicit def caseClassDecoder[F[_], A, B, E, R](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
-      dr: Lazy[EffectfulDecoder[F, A, R]]) =
+      dr: Lazy[EffectfulDecoder[F, A, R]],
+      lp: LowPriority) =
     new EffectfulDecoder[F, A, B] {
       override def decode(attributes: Map[String, A]): F[B] = {
         dr.value.decode(attributes).map(lg.from)
       }
     }
 
-  def apply[A, B](attributes: Map[String, A])(
-      implicit da: EffectfulDecoder[Try, A, B]): Try[B] = {
+  def apply[F[_], A, B](attributes: Map[String, A])(
+      implicit da: EffectfulDecoder[F, A, B]): F[B] = {
     da.decode(attributes)
   }
 }
