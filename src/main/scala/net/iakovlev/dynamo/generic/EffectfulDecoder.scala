@@ -6,7 +6,7 @@ import shapeless.labelled.{FieldType, field}
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.{Failure}
+import scala.util.Failure
 
 trait PrimitivesExtractor[F[_], A, B] {
   def extract(a: A): F[B]
