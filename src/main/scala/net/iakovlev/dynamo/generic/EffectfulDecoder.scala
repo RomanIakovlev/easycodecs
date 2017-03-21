@@ -8,8 +8,14 @@ import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 import scala.util.Failure
 
-trait PrimitivesExtractor[F[_], A, B] {
-  def extract(a: A): F[B]
+trait PrimitivesExtractor[A, B] {
+  def extract(a: A): Either[Error, B]
+}
+
+object PrimitivesExtractor {
+  def instance[A, B](f: A => Either[Error, B]) = new PrimitivesExtractor[A, B] {
+    override def extract(a: A): Either[Error, B] = f(a)
+  }
 }
 
 trait SingleFieldEffectfulDecoder[F[_], A, B] {
@@ -19,7 +25,7 @@ trait SingleFieldEffectfulDecoder[F[_], A, B] {
 object SingleFieldEffectfulDecoder {
   implicit def mapAsClassDecoder[F[_]: Monad, S, A](
       implicit d: EffectfulDecoder[F, S, A],
-      ext: PrimitivesExtractor[F, S, Map[String, S]])
+      ext: PrimitivesExtractor[S, Map[String, S]])
     : SingleFieldEffectfulDecoder[F, S, A] =
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] = {

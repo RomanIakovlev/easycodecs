@@ -7,14 +7,13 @@ import scala.collection.JavaConverters._
 import scala.collection.generic._
 import scala.language.higherKinds
 import scala.util.Try
+import cats.implicits._
 
-trait AwsAttributeValueDecoder extends Extractors[Try, aws.AttributeValue] {
+trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
 
-  implicit def extractInt: PrimitivesExtractor[Try, aws.AttributeValue, Int] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Int] {
-      override def extract(a: aws.AttributeValue): Try[Int] = {
-        Try(a.getN.toInt)
-      }
+  implicit def extractInt: PrimitivesExtractor[aws.AttributeValue, Int] =
+    PrimitivesExtractor.instance[aws.AttributeValue, Int] {
+      Either.catchNonFatal(a.getN.toInt)
     }
 
   implicit def extractLong: PrimitivesExtractor[Try, aws.AttributeValue, Long] =
