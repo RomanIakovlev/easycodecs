@@ -87,7 +87,7 @@ object SingleFieldEffectfulDecoder {
       }
     }
   implicit def coproductAsClassDecoder[F[_], S, A](
-      implicit d: Lazy[CoproductEffectfulDecoder[F, S, A]],
+      implicit d: Strict[CoproductEffectfulDecoder[F, S, A]],
       lp: LowPriority) =
     new SingleFieldEffectfulDecoder[F, S, A] {
       override def decode(a: F[S]): F[A] =
@@ -145,7 +145,7 @@ object EffectfulDecoder {
   implicit def caseClassDecoder[F[_], A, B, E, R](
       implicit f: ApplicativeError[F, E],
       lg: LabelledGeneric.Aux[B, R],
-      dr: Lazy[EffectfulDecoder[F, A, R]],
+      dr: Strict[EffectfulDecoder[F, A, R]],
       lp: LowPriority) =
     new EffectfulDecoder[F, A, B] {
       override def decode(attributes: Map[String, A]): F[B] = {
