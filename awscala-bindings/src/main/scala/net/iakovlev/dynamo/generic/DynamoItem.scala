@@ -8,7 +8,7 @@ trait DynamoItem[A] {
 }
 
 object DynamoItem {
-  def apply[A](item: GetItemResult)(implicit decoder: Decoder[A]): Option[A] = new DynamoItem[A] {
+  def apply[A](item: GetItemResult)(implicit decoder: OptionalDecoder[A]): Option[A] = new DynamoItem[A] {
     override def readItem(getItemResult: GetItemResult): Option[A] = {
       val attrs = getItemResult.getItem.asScala
       decoder.decode()

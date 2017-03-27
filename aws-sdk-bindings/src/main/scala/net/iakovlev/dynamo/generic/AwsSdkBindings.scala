@@ -1,85 +1,68 @@
 package net.iakovlev.dynamo.generic
 
-import com.amazonaws.services.dynamodbv2.model.{AttributeValue, GetItemResult}
+import com.amazonaws.services.dynamodbv2.model.GetItemResult
 import com.amazonaws.services.dynamodbv2.{model => aws}
 
 import scala.collection.JavaConverters._
 import scala.collection.generic._
 import scala.language.higherKinds
 import scala.util.Try
+import cats.implicits._
 
-trait AwsAttributeValueDecoder extends Extractors[Try, aws.AttributeValue] {
+import scala.collection.mutable
 
-  implicit def extractInt: PrimitivesExtractor[Try, aws.AttributeValue, Int] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Int] {
-      override def extract(a: aws.AttributeValue): Try[Int] = {
-        Try(a.getN.toInt)
-      }
+trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
+
+  def awsDecoder[A](m: Map[String, aws.AttributeValue])(
+    implicit d: Decoder[aws.AttributeValue, A]): Either[DecodingError, A] =
+    d.decode(m)
+
+  def instance[A](f: (aws.AttributeValue) => A)
+    : PrimitivesExtractor[aws.AttributeValue, A] =
+    new PrimitivesExtractor[aws.AttributeValue, A] {
+      override def extract(a: aws.AttributeValue): Either[DecodingError, A] =
+        Either.catchNonFatal(f(a)).leftMap(e => new ExtractionError(e))
     }
 
-  implicit def extractLong: PrimitivesExtractor[Try, aws.AttributeValue, Long] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Long] {
-      override def extract(a: aws.AttributeValue): Try[Long] = {
-        Try(a.getN.toLong)
-      }
-    }
+  implicit def extractInt: PrimitivesExtractor[aws.AttributeValue, Int] =
+    instance(_.getN.toInt)
 
-  implicit def extractBoolean: PrimitivesExtractor[Try,
-                                                   aws.AttributeValue,
-                                                   Boolean] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Boolean] {
-      override def extract(a: aws.AttributeValue): Try[Boolean] = {
-        Try(a.getBOOL)
-      }
-    }
+  implicit def extractLong: PrimitivesExtractor[aws.AttributeValue, Long] =
+    instance(_.getN.toLong)
 
-  implicit def extractFloat: PrimitivesExtractor[Try,
-                                                 aws.AttributeValue,
-                                                 Float] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Float] {
-      override def extract(a: aws.AttributeValue): Try[Float] = {
-        Try(a.getN.toFloat)
-      }
-    }
+  implicit def extractBoolean
+    : PrimitivesExtractor[aws.AttributeValue, Boolean] =
+    instance(_.getBOOL)
 
-  implicit def extractDouble: PrimitivesExtractor[Try,
-                                                  aws.AttributeValue,
-                                                  Double] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, Double] {
-      override def extract(a: aws.AttributeValue): Try[Double] = {
-        Try(a.getN.toDouble)
-      }
-    }
+  implicit def extractFloat: PrimitivesExtractor[aws.AttributeValue, Float] =
+    instance(_.getN.toFloat)
 
-  implicit def extractBigDecimal: PrimitivesExtractor[Try,
-                                                      aws.AttributeValue,
-                                                      BigDecimal] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, BigDecimal] {
-      override def extract(a: aws.AttributeValue): Try[BigDecimal] = {
-        Try(BigDecimal(a.getN))
-      }
-    }
-  implicit def extractString: PrimitivesExtractor[Try,
-                                                  aws.AttributeValue,
-                                                  String] =
-    new PrimitivesExtractor[Try, aws.AttributeValue, String] {
-      override def extract(a: aws.AttributeValue): Try[String] = {
-        Try(Option(a.getS).get)
-      }
-    }
+  implicit def extractDouble: PrimitivesExtractor[aws.AttributeValue, Double] =
+    instance(_.getN.toDouble)
+
+  implicit def extractBigDecimal
+    : PrimitivesExtractor[aws.AttributeValue, BigDecimal] =
+    instance(a => BigDecimal(a.getN))
+
+  implicit def extractString: PrimitivesExtractor[aws.AttributeValue, String] =
+    instance(a => Option(a.getS).get)
+
   implicit def extractSeq[C[X] <: Seq[X]](
-      implicit cbf: CanBuildFrom[C[Try[aws.AttributeValue]],
-                                 Try[aws.AttributeValue],
-                                 C[Try[aws.AttributeValue]]]
-  ): PrimitivesExtractor[Try, aws.AttributeValue, C[Try[aws.AttributeValue]]] =
-    new PrimitivesExtractor[Try,
-                            aws.AttributeValue,
-                            C[Try[aws.AttributeValue]]] {
-      override def extract(
-          a: aws.AttributeValue): Try[C[Try[aws.AttributeValue]]] = {
+      implicit cbf: CanBuildFrom[C[Either[DecodingError, aws.AttributeValue]],
+                                 Either[DecodingError, aws.AttributeValue],
+                                 C[Either[DecodingError, aws.AttributeValue]]]
+  ): PrimitivesExtractor[aws.AttributeValue,
+                         C[Either[DecodingError, aws.AttributeValue]]] =
+    new PrimitivesExtractor[aws.AttributeValue,
+                            C[Either[DecodingError, aws.AttributeValue]]] {
+      override def extract(a: aws.AttributeValue)
+        : Either[DecodingError, C[Either[DecodingError, aws.AttributeValue]]] = {
         for {
-          c <- Try(cbf())
-          r = a.getL.asScala.map(Try(_))
+          c <- Right[DecodingError,
+                     mutable.Builder[Either[DecodingError, aws.AttributeValue],
+                                     C[Either[DecodingError, aws.AttributeValue]]]](
+            cbf())
+          r = a.getL.asScala.map(Right(_))
         } yield {
           r.foreach(c += _)
           c.result()
@@ -88,17 +71,8 @@ trait AwsAttributeValueDecoder extends Extractors[Try, aws.AttributeValue] {
     }
 
   implicit def extractMap: PrimitivesExtractor[
-    Try,
     aws.AttributeValue,
-    Map[String, aws.AttributeValue]] =
-    new PrimitivesExtractor[Try,
-                            aws.AttributeValue,
-                            Map[String, aws.AttributeValue]] {
-      override def extract(
-          a: aws.AttributeValue): Try[Map[String, aws.AttributeValue]] = {
-        Try(a.getM.asScala.toMap)
-      }
-    }
+    Map[String, aws.AttributeValue]] = instance(a => a.getM.asScala.toMap)
 }
 
 trait AwsSdkBindings {
@@ -148,16 +122,14 @@ trait AwsSdkBindings {
   }
 
   def from[A](getItemResult: GetItemResult)(
-      implicit decoder: Decoder[A]): Option[A] =
+      implicit decoder: OptionalDecoder[A]): Option[A] =
     Option(getItemResult).flatMap(gotItemResult =>
       decoder.decode(getItemResultToCore(gotItemResult)))
 
   def monadic[A](getItemResult: GetItemResult)(
-      implicit decoder: EffectfulDecoder[Try, aws.AttributeValue, A])
-    : Try[A] = {
-    Try {
-      decoder.decode(getItemResult.getItem.asScala.toMap)
-    }.flatten
+      implicit decoder: Decoder[aws.AttributeValue, A])
+    : Either[DecodingError, A] = {
+    decoder.decode(getItemResult.getItem.asScala.toMap)
   }
 }
 

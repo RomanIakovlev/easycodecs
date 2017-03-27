@@ -6,7 +6,7 @@ class ExperimentalDecoderTest extends Specification {
   "Experimental generic decoder derivation facility should" >> {
     "Use custom decoder" >> {
       case class Test(s: List[Int])
-      val d = new Decoder[Test] {
+      val d = new OptionalDecoder[Test] {
         override def decode(
             attributes: Map[String, AttributeValue]): Option[Test] = {
           attributes.get("s").flatMap {
@@ -20,33 +20,9 @@ class ExperimentalDecoderTest extends Specification {
       res must not be empty
       res.get must_== Test(List(1, 2, 3))
     }
-    "Use map based decoder for nested classes" >> {
-      case class Child(s: String)
-      case class Custom(c: Child, s: String)
-      case class Parent(s: String, c: Custom)
-      val res = Decoder[Parent](
-        Map(
-          "s" -> AttributeValue("hello"),
-          "c" -> AttributeValueMap(
-            Map("s" -> AttributeValue("world"),
-                "c" -> AttributeValueMap(Map("s" -> AttributeValue("lol")))))))
-      res must not be empty
-      res.get must_== Parent("hello", Custom(Child("lol"), "world"))
-    }
-    "Decode case classes lists" >> {
-      case class Child(s: String)
-      case class Parent(c: List[Child])
-      val res = Decoder[Parent](
-        Map(
-          "c" -> AttributeValueList(
-            List(AttributeValueMap(Map("s" -> AttributeValue("bla"))))))
-      )
-      res must not be empty
-      res.get must_== Parent(List(Child("bla")))
-    }
     "Decode scalar lists" >> {
       case class Parent(c: List[String])
-      val res = Decoder[Parent](
+      val res = OptionalDecoder[Parent](
         Map("c" -> AttributeValueList(List(AttributeValue("bla"))))
       )
       res must not be empty
@@ -54,26 +30,26 @@ class ExperimentalDecoderTest extends Specification {
     }
     "Decode optional fields" >> {
       case class Optional(o: Option[String])
-      val res1 = Decoder[Optional](Map("o" -> AttributeValue("123")))
+      val res1 = OptionalDecoder[Optional](Map("o" -> AttributeValue("123")))
       res1 must not be empty
       res1.get must_== Optional(Some("123"))
-      val res2 = Decoder[Optional](Map())
+      val res2 = OptionalDecoder[Optional](Map())
       res2 must not be empty
       res2.get must_== Optional(None)
     }
     "Fail to decode optional fields if attribute has wrong type" >> {
       case class Optional(o: Option[String])
-      val res = Decoder[Optional](Map("o" -> AttributeValue(123)))
+      val res = OptionalDecoder[Optional](Map("o" -> AttributeValue(123)))
       res must beEmpty
     }
     "Decode map field as a simple map, not nested class" >> {
       case class MapHostString(m: Map[String, String])
-      val res = Decoder[MapHostString](
+      val res = OptionalDecoder[MapHostString](
         Map("m" -> AttributeValue("hello" -> AttributeValue("world"))))
       res must not be empty
       res.get must_== MapHostString(Map("hello" -> "world"))
       case class MapHostInt(m: Map[String, Int])
-      val res1 = Decoder[MapHostInt](
+      val res1 = OptionalDecoder[MapHostInt](
         Map("m" -> AttributeValue("hello" -> AttributeValue(123))))
       res1 must not be empty
       res1.get must_== MapHostInt(Map("hello" -> 123))
@@ -86,7 +62,7 @@ class ExperimentalDecoderTest extends Specification {
                              b: BigDecimal,
                              n: BigDecimal)
       val res =
-        Decoder[AllNumerals](
+        OptionalDecoder[AllNumerals](
           Map("i" -> AttributeValue(1),
               "l" -> AttributeValue(2l),
               "f" -> AttributeValue(3.0f),
@@ -101,7 +77,7 @@ class ExperimentalDecoderTest extends Specification {
       case class A(a: String) extends ADT
       case class B(b: String) extends ADT
       case class O(a: ADT, b: ADT)
-      val res = Decoder[O](
+      val res = OptionalDecoder[O](
         Map("a" -> AttributeValue("a" -> AttributeValue("AAA")),
             "b" -> AttributeValue("b" -> AttributeValue("BBB"))))
       res must not be empty
@@ -112,7 +88,7 @@ class ExperimentalDecoderTest extends Specification {
       case object A extends ADT
       case object B extends ADT
       case class O(a: ADT, b: ADT)
-      val res = Decoder[O](Map("a" -> AttributeValue("A"), "b" -> AttributeValue("B")))
+      val res = OptionalDecoder[O](Map("a" -> AttributeValue("A"), "b" -> AttributeValue("B")))
       res must not be empty
       res.get must_== O(A, B)
     }

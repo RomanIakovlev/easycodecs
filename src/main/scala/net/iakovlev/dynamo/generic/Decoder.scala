@@ -1,216 +1,211 @@
 package net.iakovlev.dynamo.generic
-
 import cats.implicits._
+import cats.{Applicative, ApplicativeError, Monad, MonadError, Traverse}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
+import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.Try
-trait SingleFieldDecoder[A] {
-  def decode(attributeValue: Option[AttributeValue]): Option[A]
+import scala.util.Failure
+
+abstract sealed class DecodingError extends Throwable {
+  override def fillInStackTrace(): Throwable = this
 }
 
-object SingleFieldDecoder {
-  implicit def optionDecoder[A](implicit d: SingleFieldDecoder[A]) =
-    new SingleFieldDecoder[Option[A]] {
+class MissingFieldError extends DecodingError
+class ExtractionError(val t: Throwable) extends DecodingError
+class OtherError extends DecodingError
+
+import Decoder.Result
+
+trait PrimitivesExtractor[S, A] {
+  def extract(a: S): Either[DecodingError, A]
+}
+
+trait SingleFieldEffectfulDecoder[S, A] {
+  def decode(a: Either[DecodingError, S]): Either[DecodingError, A]
+}
+
+object SingleFieldEffectfulDecoder {
+
+  def instance[S, A](f: Either[DecodingError, S] => Result[A])
+    : SingleFieldEffectfulDecoder[S, A] =
+    new SingleFieldEffectfulDecoder[S, A] {
+      override def decode(a: Either[DecodingError, S]): Result[A] = {
+        f(a)
+      }
+    }
+
+  implicit def mapAsClassDecoder[S, A](
+      implicit d: Decoder[S, A],
+      ext: PrimitivesExtractor[S, Map[String, S]])
+    : SingleFieldEffectfulDecoder[S, A] =
+    instance { a =>
+      for {
+        b <- a
+        c <- ext.extract(b)
+        d <- d.decode(c)
+      } yield d
+    }
+
+  implicit def mapAsMapDecoder[S, A](
+      implicit d: SingleFieldEffectfulDecoder[S, A],
+      ext: PrimitivesExtractor[S, Map[String, S]])
+    : SingleFieldEffectfulDecoder[S, Map[String, A]] =
+    instance { a =>
+      val z: Either[DecodingError, Either[DecodingError, Map[String, A]]] =
+        for {
+          b <- a
+          c <- ext.extract(b)
+        } yield {
+          c.traverseU { v =>
+            d.decode(Right(v))
+          }
+        }
+      z.flatten
+    }
+
+  implicit def traversableExtractorDecoder[S, A, C[X] <: Seq[X]: Traverse](
+      implicit cbf: CanBuildFrom[C[A], A, C[A]],
+      ad: SingleFieldEffectfulDecoder[S, A],
+      ext: PrimitivesExtractor[S, C[Either[DecodingError, S]]])
+    : SingleFieldEffectfulDecoder[S, C[A]] =
+    new SingleFieldEffectfulDecoder[S, C[A]] {
       override def decode(
-          attributeValue: Option[AttributeValue]): Option[Option[A]] = {
-        println("option decoder")
-        if (attributeValue.isEmpty) Some(None)
-        else d.decode(attributeValue).map(Some.apply)
-      }
-    }
-
-  implicit def intDecoder = new SingleFieldDecoder[Int] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[Int] = {
-      println("int decoder")
-      attributeValue match {
-        case Some(AttributeValueInt(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) => Try(value.toInt).toOption
-        case _ => None
-      }
-    }
-  }
-
-  implicit def longDecoder = new SingleFieldDecoder[Long] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[Long] = {
-      println("long decoder")
-      attributeValue match {
-        case Some(AttributeValueLong(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) => Try(value.toLong).toOption
-        case _ => None
-      }
-    }
-  }
-
-  implicit def floatDecoder = new SingleFieldDecoder[Float] {
-    override def decode(
-        attributeValue: Option[AttributeValue]): Option[Float] = {
-      println("float decoder")
-      attributeValue match {
-        case Some(AttributeValueFloat(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) => Try(value.toFloat).toOption
-        case _ => None
-      }
-    }
-  }
-
-  implicit def doubleDecoder = new SingleFieldDecoder[Double] {
-    override def decode(
-        attributeValue: Option[AttributeValue]): Option[Double] = {
-      println("double decoder")
-      attributeValue match {
-        case Some(AttributeValueDouble(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) => Try(value.toDouble).toOption
-        case _ => None
-      }
-    }
-  }
-
-  implicit def bigDecimalDecoder = new SingleFieldDecoder[BigDecimal] {
-    override def decode(
-        attributeValue: Option[AttributeValue]): Option[BigDecimal] = {
-      println("big decimal decoder")
-      attributeValue match {
-        case Some(AttributeValueBigDecimal(value)) => Some(value)
-        case Some(AttributeValueNumeric(value)) =>
-          Try(BigDecimal(value)).toOption
-        case _ => None
-      }
-    }
-  }
-  implicit def stringDecoder = new SingleFieldDecoder[String] {
-    override def decode(
-        attributeValue: Option[AttributeValue]): Option[String] = {
-      println("string decoder")
-      attributeValue match {
-        case Some(AttributeValueString(value)) => Some(value)
-        case _ => None
-      }
-    }
-  }
-  implicit def mapAsMapDecoder[A](implicit d: SingleFieldDecoder[A],
-                                  t: Typeable[A]) =
-    new SingleFieldDecoder[Map[String, A]] {
-      override def decode(
-          attributeValue: Option[AttributeValue]): Option[Map[String, A]] = {
-        attributeValue match {
-          case Some(AttributeValueMap(value)) =>
-            value.mapValues(Some.apply).mapValues(d.decode).sequence
-          case _ => None
+          a: Either[DecodingError, S]): Either[DecodingError, C[A]] = {
+        val builder = cbf()
+        for {
+          s <- a
+          cfs <- ext.extract(s)
+          r <- cfs.traverseU(ad.decode)
+        } yield {
+          r.foreach(builder += _)
+          builder.result()
         }
       }
     }
-  implicit def mapAsClassDecoder[A](implicit dm: Decoder[A],
-                                    t: Typeable[A]) =
-    new SingleFieldDecoder[A] {
-      override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
-        println("map decoder " + t.describe)
-        attributeValue match {
-          case Some(AttributeValueMap(value)) =>
-            dm.decode(value)
-          case _ => None
-        }
-      }
-    }
-  implicit def listDecoder[A](implicit d: SingleFieldDecoder[A],
-                              t: Typeable[A]) =
-    new SingleFieldDecoder[List[A]] {
+
+  implicit def extractorDecoder[S, A](implicit ext: PrimitivesExtractor[S, A])
+    : SingleFieldEffectfulDecoder[S, A] =
+    new SingleFieldEffectfulDecoder[S, A] {
       override def decode(
-          attributeValue: Option[AttributeValue]): Option[List[A]] = {
-        println("list decoder " + t.describe)
-        attributeValue match {
-          case Some(AttributeValueList(value)) =>
-            value.toList.map(Some.apply).traverse(d.decode)
-          case _ => None
+          a: Either[DecodingError, S]): Either[DecodingError, A] =
+        a.flatMap(aa => ext.extract(aa))
+    }
+  implicit def optionalDecoder[S, A](
+      implicit d: SingleFieldEffectfulDecoder[S, A])
+    : SingleFieldEffectfulDecoder[S, Option[A]] =
+    new SingleFieldEffectfulDecoder[S, Option[A]] {
+      override def decode(
+          a: Either[DecodingError, S]): Either[DecodingError, Option[A]] = {
+        d.decode(a).map(Option.apply).recoverWith {
+          case _: MissingFieldError =>
+            Right(None)
+          case e =>
+            Left(e)
         }
       }
     }
-  implicit def coproductAsClassDecoder[A](
-      implicit d: Lazy[CoproductDecoder[A]],
+  implicit def coproductAsClassDecoder[S, A](
+      implicit d: Strict[CoproductEffectfulDecoder[S, A]],
       lp: LowPriority) =
-    new SingleFieldDecoder[A] {
-      override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
-        d.value.decode(attributeValue)
+    new SingleFieldEffectfulDecoder[S, A] {
+      override def decode(
+          a: Either[DecodingError, S]): Either[DecodingError, A] =
+        d.value.decode(a)
+    }
+  implicit def decodeEnum[S, A, C <: Coproduct](
+      implicit gen: LabelledGeneric.Aux[A, C],
+      ds: SingleFieldEffectfulDecoder[S, String],
+      rie: IsEnum[C]) =
+    new SingleFieldEffectfulDecoder[S, A] {
+      override def decode(
+          a: Either[DecodingError, S]): Either[DecodingError, A] = {
+        ds.decode(a)
+          .flatMap(
+            s =>
+              rie
+                .from(s)
+                .map(gen.from)
+                .map(v => Right(v))
+                .getOrElse(Left(new MissingFieldError)))
       }
     }
-
-  implicit def decodeEnum[A, C <: Coproduct](
-      implicit gen: LabelledGeneric.Aux[A, C],
-      ds: SingleFieldDecoder[String],
-      rie: IsEnum[C]) = new SingleFieldDecoder[A] {
-    override def decode(attributeValue: Option[AttributeValue]): Option[A] = {
-      ds.decode(attributeValue).flatMap(s => rie.from(s).map(gen.from))
-    }
-  }
 }
 
-trait Decoder[A] {
-  def decode(attributes: Map[String, AttributeValue]): Option[A]
+trait Decoder[A, B] {
+  def decode(a: Map[String, A]): Either[DecodingError, B]
 }
 
 object Decoder {
 
-  implicit def hNilDecoder = new Decoder[HNil] {
-    override def decode(
-        attributes: Map[String, AttributeValue]): Option[HNil] = Some(HNil)
-  }
-  implicit def hConsDecoder[K <: Symbol, H, T <: HList](
+  type Result[A] = Either[DecodingError, A]
+
+  def instance[S, A](
+      f: Map[String, S] => Either[DecodingError, A]): Decoder[S, A] =
+    new Decoder[S, A] {
+      override def decode(a: Map[String, S]): Either[DecodingError, A] = f(a)
+    }
+  implicit def hNilDecoder[A]: Decoder[A, HNil] =
+    instance(_ => Right(HNil))
+
+  implicit def hConsDecoder[A, K <: Symbol, H, T <: HList](
       implicit k: Witness.Aux[K],
-      d: SingleFieldDecoder[H],
-      dt: Decoder[T],
-      t: Typeable[H]) = new Decoder[FieldType[K, H] :: T] {
-    override def decode(attributes: Map[String, AttributeValue])
-      : Option[FieldType[K, H] :: T] = {
-      println("hcons decoder " + t.describe)
-      val attr = attributes.get(k.value.name)
-      for {
-        h <- d.decode(attr)
-        t <- dt.decode(attributes)
-      } yield field[K](h) :: t
+      d: SingleFieldEffectfulDecoder[A, H],
+      dt: Decoder[A, T]): Decoder[A, FieldType[K, H] :: T] =
+    instance { attributes =>
+      val x =
+        Either.fromOption(attributes.get(k.value.name), new MissingFieldError)
+      (d.decode(x) |@| dt.decode(attributes)).map { field[K](_) :: _ }
     }
+
+  // LowPriority to allow the companion object-defined instances to take priority
+  implicit def caseClassDecoder[A, B, R](
+      implicit lg: LabelledGeneric.Aux[B, R],
+      dr: Strict[Decoder[A, R]],
+      lp: LowPriority): Decoder[A, B] = instance { attributes =>
+    dr.value.decode(attributes).map(lg.from)
   }
 
-  implicit def caseClassDecoder[A, R](implicit lg: LabelledGeneric.Aux[A, R],
-                                      dr: Decoder[R],
-                                      t: Typeable[A]) = new Decoder[A] {
-    override def decode(attributes: Map[String, AttributeValue]): Option[A] = {
-      println("case class decoder " + t.describe)
-      dr.decode(attributes).map(lg.from)
-    }
-  }
-
-  def apply[A](attributes: Map[String, AttributeValue])(
-      implicit da: Decoder[A]): Option[A] = {
+  def apply[A, B](attributes: Map[String, A])(
+      implicit da: Decoder[A, B]): Either[DecodingError, B] = {
     da.decode(attributes)
   }
 }
 
-trait CoproductDecoder[A] {
-  def decode(a: Option[AttributeValue]): Option[A]
+trait CoproductEffectfulDecoder[A, B] {
+  def decode(a: Either[DecodingError, A]): Either[DecodingError, B]
 }
 
-object CoproductDecoder {
-  implicit val cNilDecoder = new CoproductDecoder[CNil] {
-    override def decode(a: Option[AttributeValue]): Option[CNil] = None
-  }
-
-  implicit def coproductDecoder[K <: Symbol, H, T <: Coproduct](
-      implicit dh: SingleFieldDecoder[H],
-      dt: SingleFieldDecoder[T]) =
-    new CoproductDecoder[FieldType[K, H] :+: T] {
+object CoproductEffectfulDecoder {
+  implicit def cNilDecoder[A, B]: CoproductEffectfulDecoder[A, CNil] =
+    new CoproductEffectfulDecoder[A, CNil] {
       override def decode(
-          a: Option[AttributeValue]): Option[FieldType[K, H] :+: T] = {
-        dh.decode(a)
-          .map(aa => Inl(field[K](aa)))
-          .orElse(dt.decode(a).map(Inr(_)))
+          a: Either[DecodingError, A]): Either[DecodingError, CNil] =
+        Left(new OtherError)
+    }
+
+  implicit def coproductDecoder[A, K <: Symbol, H, T <: Coproduct](
+      implicit dh: SingleFieldEffectfulDecoder[A, H],
+      dt: SingleFieldEffectfulDecoder[A, T]) =
+    new CoproductEffectfulDecoder[A, FieldType[K, H] :+: T] {
+      override def decode(a: Either[DecodingError, A])
+        : Either[DecodingError, FieldType[K, H] :+: T] = {
+        val r: Either[DecodingError, H] = dh.decode(a)
+        r.map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T).recoverWith {
+          case _ =>
+            val t: Either[DecodingError, T] = dt.decode(a)
+            t.map(Inr(_))
+        }
       }
     }
-  implicit def genericDecoder[A, R <: Coproduct](
-      implicit lg: LabelledGeneric.Aux[A, R],
-      d: CoproductDecoder[R]) = new CoproductDecoder[A] {
-    override def decode(a: Option[AttributeValue]): Option[A] = {
-      d.decode(a).map(lg.from)
+  implicit def genericDecoder[A, B, R <: Coproduct](
+      implicit lg: LabelledGeneric.Aux[B, R],
+      d: CoproductEffectfulDecoder[A, R]) =
+    new CoproductEffectfulDecoder[A, B] {
+      override def decode(
+          a: Either[DecodingError, A]): Either[DecodingError, B] = {
+        d.decode(a).map(lg.from)
+      }
     }
-  }
 }
