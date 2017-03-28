@@ -9,10 +9,10 @@ class DecodeScalarListsTest
     with AwsAttributeValueDecoder {
 
   "Decode scalar lists" >> {
-    case class Parent(cc: List[Int])
+    case class Parent(cc: Seq[Int])
     val res = awsDecoder[Parent](
       Map("cc" -> new aws.AttributeValue().withL(new aws.AttributeValue().withN("1")))
     )
-    res must beRight(Parent(List(1)))
+    res must beRight(Parent(Seq(1)))
   }
 }

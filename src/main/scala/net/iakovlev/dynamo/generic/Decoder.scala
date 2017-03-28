@@ -1,12 +1,11 @@
 package net.iakovlev.dynamo.generic
 import cats.implicits._
-import cats.{Applicative, ApplicativeError, Monad, MonadError, Traverse}
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.Failure
+import scala.util.{Left, Right}
 
 abstract sealed class DecodingError extends Throwable {
   override def fillInStackTrace(): Throwable = this
@@ -65,23 +64,31 @@ object SingleFieldEffectfulDecoder {
       z.flatten
     }
 
-  implicit def traversableExtractorDecoder[S, A, C[X] <: Seq[X]: Traverse](
+  implicit def traversableExtractorDecoder[S, A, C[X] <: Iterable[X]](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       ad: SingleFieldEffectfulDecoder[S, A],
-      ext: PrimitivesExtractor[S, C[Either[DecodingError, S]]])
+      ext: PrimitivesExtractor[S, C[S]])
     : SingleFieldEffectfulDecoder[S, C[A]] =
     new SingleFieldEffectfulDecoder[S, C[A]] {
       override def decode(
           a: Either[DecodingError, S]): Either[DecodingError, C[A]] = {
-        val builder = cbf()
-        for {
+        (for {
           s <- a
-          cfs <- ext.extract(s)
-          r <- cfs.traverseU(ad.decode)
+          cs <- ext.extract(s)
         } yield {
-          r.foreach(builder += _)
-          builder.result()
-        }
+          val builder = cbf()
+          cs.foldLeft(None: Option[DecodingError]) { (_, a) =>
+            ad.decode(Right(a)) match {
+              case Left(e) => Some(e)
+              case Right(r) =>
+                builder += r
+                None
+            }
+          } match {
+            case Some(e) => Left(e)
+            case None => Right(builder.result())
+          }
+        }).flatten
       }
     }
 
@@ -186,13 +193,12 @@ object CoproductEffectfulDecoder {
     }
 
   implicit def coproductDecoder[A, K <: Symbol, H, T <: Coproduct](
-      implicit dh: SingleFieldEffectfulDecoder[A, H],
+      implicit dh: Lazy[SingleFieldEffectfulDecoder[A, H]],
       dt: SingleFieldEffectfulDecoder[A, T]) =
     new CoproductEffectfulDecoder[A, FieldType[K, H] :+: T] {
       override def decode(a: Either[DecodingError, A])
         : Either[DecodingError, FieldType[K, H] :+: T] = {
-        val r: Either[DecodingError, H] = dh.decode(a)
-        r.map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T).recoverWith {
+        dh.value.decode(a).map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T).recoverWith {
           case _ =>
             val t: Either[DecodingError, T] = dt.decode(a)
             t.map(Inr(_))

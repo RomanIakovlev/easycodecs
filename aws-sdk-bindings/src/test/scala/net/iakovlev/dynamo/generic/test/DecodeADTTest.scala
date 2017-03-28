@@ -12,7 +12,7 @@ class DecodeADTTest
     sealed trait ADT
     case class A(a: String) extends ADT
     case class B(b: String) extends ADT
-    case class O(a: ADT, b: ADT)
+    case class O(a: ADT, b: ADT) extends ADT
     val res = awsDecoder[O](
       Map("a" -> new aws.AttributeValue()
         .addMEntry("a", new aws.AttributeValue("AAA")),

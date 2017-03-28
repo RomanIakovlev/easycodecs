@@ -48,25 +48,22 @@ trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
     instance(a => Option(a.getS).get)
 
   implicit def extractSeq[C[X] <: Seq[X]](
-      implicit cbf: CanBuildFrom[C[Either[DecodingError, aws.AttributeValue]],
-                                 Either[DecodingError, aws.AttributeValue],
-                                 C[Either[DecodingError, aws.AttributeValue]]]
+      implicit cbf: CanBuildFrom[C[aws.AttributeValue],
+                                 aws.AttributeValue,
+                                 C[aws.AttributeValue]]
   ): PrimitivesExtractor[aws.AttributeValue,
-                         C[Either[DecodingError, aws.AttributeValue]]] =
+                         C[aws.AttributeValue]] =
     new PrimitivesExtractor[aws.AttributeValue,
-                            C[Either[DecodingError, aws.AttributeValue]]] {
+                            C[aws.AttributeValue]] {
       override def extract(a: aws.AttributeValue)
-        : Either[DecodingError, C[Either[DecodingError, aws.AttributeValue]]] = {
-        for {
-          c <- Right[DecodingError,
-                     mutable.Builder[Either[DecodingError, aws.AttributeValue],
-                                     C[Either[DecodingError, aws.AttributeValue]]]](
-            cbf())
-          r = a.getL.asScala.map(Right(_))
-        } yield {
+        : Either[DecodingError, C[aws.AttributeValue]] = {
+        val c = cbf()
+        Either.catchNonFatal(a.getL.asScala).map { r =>
           r.foreach(c += _)
           c.result()
         }
+      }.leftMap {
+        case t: Throwable => new ExtractionError(t)
       }
     }
 
