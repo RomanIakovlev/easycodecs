@@ -6,8 +6,9 @@ import cats.syntax.cartesian._
 import shapeless.{:+:, _}
 import shapeless.labelled.{FieldType, _}
 
+import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.util.Left
+import scala.util.{Left, Right}
 import scala.util.control.NoStackTrace
 
 abstract sealed class EncodingError extends Throwable with NoStackTrace
@@ -64,16 +65,40 @@ object SingleFieldEncoder {
         f(a)
       }
     }
+  implicit def traversableWriterEncoder[A, B, C[X] <: Traversable[X]](
+      implicit cbf: CanBuildFrom[C[B], B, C[B]],
+      ae: SingleFieldEncoder[A, B],
+      w: PrimitivesWriter[C[B], B]): SingleFieldEncoder[C[A], B] =
+    new SingleFieldEncoder[C[A], B] {
+      override def encode(a: C[A]): Either[EncodingError, B] = {
+        val c = cbf()
+        a.foldLeft(None: Option[EncodingError]) { (_, elem) =>
+          ae.encode(elem) match {
+            case Left(e) =>
+              Some(e)
+            case Right(r) =>
+              c += r
+              None
+          }
+        } match {
+          case Some(x) => Left(x)
+          case None => Right(w.write(c.result()))
+        }
+      }
+    }
+
   implicit def coproductEncoder[A, B](
       implicit e: CoproductEncoder[A, B],
       lp: LowPriority): SingleFieldEncoder[A, B] =
     instance { a =>
+      println("coproductEncoder")
       e.encode(a)
     }
   implicit def classAsMapEncoder[A, B](
       implicit e: Encoder[A, B],
       w: PrimitivesWriter[Map[String, B], B]): SingleFieldEncoder[A, B] =
     instance { a =>
+      println("classAsMapEncoder")
       for {
         b <- e.encode(a)
       } yield w.write(b)
@@ -82,6 +107,7 @@ object SingleFieldEncoder {
       implicit primitivesWriter: PrimitivesWriter[A, B])
     : SingleFieldEncoder[A, B] =
     instance { a =>
+      println("primitivesEncoder")
       Right(primitivesWriter.write(a))
     }
 

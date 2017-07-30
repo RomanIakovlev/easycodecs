@@ -48,7 +48,7 @@ trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
   implicit def extractString: PrimitivesExtractor[aws.AttributeValue, String] =
     instance(a => Option(a.getS).get)
 
-  implicit def extractSeq[C[X] <: Seq[X]](
+  implicit def extractSeq[C[X] <: Traversable[X]](
       implicit cbf: CanBuildFrom[C[aws.AttributeValue],
                                  aws.AttributeValue,
                                  C[aws.AttributeValue]]

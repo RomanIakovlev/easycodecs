@@ -92,7 +92,7 @@ trait AttributeValueBindings
       case a: AttributeValueString => a.value
     }
 
-  override implicit def extractSeq[C[X] <: Seq[X]](
+  override implicit def extractSeq[C[X] <: Traversable[X]](
       implicit canBuildFrom: CanBuildFrom[C[AttributeValue],
                                           AttributeValue,
                                           C[AttributeValue]])
@@ -140,18 +140,25 @@ trait AttributeValueBindings
   override implicit def writeDouble: PrimitivesWriter[Double, AttributeValue] =
     writerInstance(AttributeValueDouble)
 
-  override implicit def writeBigDecimal: PrimitivesWriter[BigDecimal, AttributeValue] =
+  override implicit def writeBigDecimal
+    : PrimitivesWriter[BigDecimal, AttributeValue] =
     writerInstance(AttributeValueBigDecimal)
 
-  override implicit def writeBoolean: PrimitivesWriter[Boolean, AttributeValue] =
+  override implicit def writeBoolean
+    : PrimitivesWriter[Boolean, AttributeValue] =
     writerInstance(AttributeValueBoolean)
 
   override implicit def writeString: PrimitivesWriter[String, AttributeValue] =
     writerInstance(AttributeValueString)
 
-  override implicit def writeSeq[C[X] <: Seq[X]](implicit canBuildFrom: CanBuildFrom[C[AttributeValue], AttributeValue, C[AttributeValue]]): PrimitivesWriter[C[AttributeValue], AttributeValue] =
-    writerInstance(AttributeValueList)
+  override implicit def writeSeq[C[X] <: Traversable[X]](
+      implicit canBuildFrom: CanBuildFrom[C[AttributeValue],
+                                          AttributeValue,
+                                          C[AttributeValue]])
+    : PrimitivesWriter[C[AttributeValue], AttributeValue] =
+    writerInstance(a => AttributeValueList(a.toSeq))
 
-  override implicit def writeMap: PrimitivesWriter[Map[String, AttributeValue], AttributeValue] =
+  override implicit def writeMap
+    : PrimitivesWriter[Map[String, AttributeValue], AttributeValue] =
     writerInstance(AttributeValueMap)
 }

@@ -2,8 +2,22 @@ package net.iakovlev.dynamo.generic
 
 import org.specs2.mutable.Specification
 
-class EffectfulDecoderTest extends Specification {
-  "Decoder should" >> {
+class CodecParityTest extends Specification {
+  "Encoder and Decoder should be on par in terms of" >> {
+    "collections" >> {
+      case class C(l: Vector[Int])
+      val translation = Map("l" -> AttributeValueList(
+        List(AttributeValueInt(1), AttributeValueInt(2), AttributeValueInt(3))))
+      val original = C(Vector(1, 2, 3))
+      val decoded = Decoder[AttributeValue, C].decode(translation)
+      println("!!! decoded " + decoded)
+      decoded must beRight(original)
+      val encoded = Encoder[C, AttributeValue].encode(original)
+      println("!!! encoded " + encoded)
+      encoded must beRight(translation)
+    }
+  }
+  /*"Decoder should" >> {
     "decode case classes" >> {
       case class Inner(j: String)
       case class Simple(i: Int, n: Inner)
@@ -17,8 +31,16 @@ class EffectfulDecoderTest extends Specification {
       )
       d must beRight(Outer(Simple(123, Inner("hello"))))
     }
+    "decode collections" >> {
+
+    }
   }
   "Encoder should" >> {
+    "encode simple case classes" >> {
+      case class I(i: Int)
+      Encoder[I, AttributeValue].encode(I(5)) should beRight(
+        Map("i" -> AttributeValueInt(5)))
+    }
     "encode case classes" >> {
       case class Inner(j: String)
       case class Simple(i: Int, n: Inner)
@@ -41,5 +63,17 @@ class EffectfulDecoderTest extends Specification {
         Map("a" -> AttributeValueMap(Map("a" -> AttributeValueString("AAA"))),
             "b" -> AttributeValueMap(Map("b" -> AttributeValueString("BBB")))))
     }
-  }
+    "encode primitives collections" >> {
+      case class C(l: Vector[Int])
+      val res = Encoder[C, AttributeValue].encode(C(Vector(1, 2, 3)))
+      println("!!!!!!!!!!!!" + res)
+      res must beRight(
+        Map(
+          "l" -> AttributeValueList(
+            List(AttributeValueInt(1),
+                 AttributeValueInt(2),
+                 AttributeValueInt(3))))
+      )
+    }
+  }*/
 }

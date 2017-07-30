@@ -64,11 +64,10 @@ object SingleFieldEffectfulDecoder {
       z.flatten
     }
 
-  implicit def traversableExtractorDecoder[S, A, C[X] <: Iterable[X]](
+  implicit def traversableExtractorDecoder[S, A, C[X] <: Traversable[X]](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       ad: SingleFieldEffectfulDecoder[S, A],
-      ext: PrimitivesExtractor[S, C[S]])
-    : SingleFieldEffectfulDecoder[S, C[A]] =
+      ext: PrimitivesExtractor[S, C[S]]): SingleFieldEffectfulDecoder[S, C[A]] =
     new SingleFieldEffectfulDecoder[S, C[A]] {
       override def decode(
           a: Either[DecodingError, S]): Either[DecodingError, C[A]] = {
@@ -86,7 +85,7 @@ object SingleFieldEffectfulDecoder {
             }
           } match {
             case Some(e) => Left(e)
-            case None => Right(builder.result())
+            case None    => Right(builder.result())
           }
         }).flatten
       }
@@ -167,17 +166,14 @@ object Decoder {
     }
 
   // LowPriority to allow the companion object-defined instances to take priority
-  implicit def caseClassDecoder[A, B, R](
-      implicit lg: LabelledGeneric.Aux[B, R],
-      dr: Strict[Decoder[A, R]],
-      lp: LowPriority): Decoder[A, B] = instance { attributes =>
-    dr.value.decode(attributes).map(lg.from)
-  }
+  implicit def caseClassDecoder[A, B, R](implicit lg: LabelledGeneric.Aux[B, R],
+                                         dr: Strict[Decoder[A, R]],
+                                         lp: LowPriority): Decoder[A, B] =
+    instance { attributes =>
+      dr.value.decode(attributes).map(lg.from)
+    }
 
-  def apply[A, B](attributes: Map[String, A])(
-      implicit da: Decoder[A, B]): Either[DecodingError, B] = {
-    da.decode(attributes)
-  }
+  def apply[A, B](implicit da: Decoder[A, B]): Decoder[A, B] = da
 }
 
 trait CoproductEffectfulDecoder[A, B] {
@@ -198,11 +194,14 @@ object CoproductEffectfulDecoder {
     new CoproductEffectfulDecoder[A, FieldType[K, H] :+: T] {
       override def decode(a: Either[DecodingError, A])
         : Either[DecodingError, FieldType[K, H] :+: T] = {
-        dh.value.decode(a).map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T).recoverWith {
-          case _ =>
-            val t: Either[DecodingError, T] = dt.decode(a)
-            t.map(Inr(_))
-        }
+        dh.value
+          .decode(a)
+          .map(aa => Inl(field[K](aa)): FieldType[K, H] :+: T)
+          .recoverWith {
+            case _ =>
+              val t: Either[DecodingError, T] = dt.decode(a)
+              t.map(Inr(_))
+          }
       }
     }
   implicit def genericDecoder[A, B, R <: Coproduct](

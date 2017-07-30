@@ -11,7 +11,7 @@ trait Extractors[S] {
   implicit def extractBigDecimal: PrimitivesExtractor[S, BigDecimal]
   implicit def extractBoolean: PrimitivesExtractor[S, Boolean]
   implicit def extractString: PrimitivesExtractor[S, String]
-  implicit def extractSeq[C[X] <: Seq[X]](
+  implicit def extractSeq[C[X] <: Traversable[X]](
       implicit canBuildFrom: CanBuildFrom[C[S], S, C[S]])
     : PrimitivesExtractor[S, C[S]]
   implicit def extractMap: PrimitivesExtractor[S, Map[String, S]]
@@ -25,7 +25,7 @@ trait Writers[S] {
   implicit def writeBigDecimal: PrimitivesWriter[BigDecimal, S]
   implicit def writeBoolean: PrimitivesWriter[Boolean, S]
   implicit def writeString: PrimitivesWriter[String, S]
-  implicit def writeSeq[C[X] <: Seq[X]](
+  implicit def writeSeq[C[X] <: Traversable[X]](
       implicit canBuildFrom: CanBuildFrom[C[S], S, C[S]])
     : PrimitivesWriter[C[S], S]
   implicit def writeMap: PrimitivesWriter[Map[String, S], S]
