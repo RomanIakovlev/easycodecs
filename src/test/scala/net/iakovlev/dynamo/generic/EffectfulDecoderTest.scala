@@ -1,41 +1,45 @@
 package net.iakovlev.dynamo.generic
 
-import cats.data.Kleisli
-import cats.implicits._
 import org.specs2.mutable.Specification
 
-import scala.util.{Failure, Success, Try}
-
-//import scala.language.implicitConversions
-
-/*class EffectfulDecoderTest extends Specification {
-  "Monadic decoder should" >> {
-    "decode simple case class" >> {
+class EffectfulDecoderTest extends Specification {
+  "Decoder should" >> {
+    "decode case classes" >> {
       case class Inner(j: String)
       case class Simple(i: Int, n: Inner)
       case class Outer(s: Simple)
-      implicit def intAwsDecoder: SingleFieldEffectfulDecoder[Try,
-                                                            AttributeValue,
-                                                            Int] =
-        new SingleFieldEffectfulDecoder[Try, AttributeValue, Int] {
-          override def decode(a: AttributeValue): Try[Int] =
-            a match {
-              case AttributeValueInt(value) => Success(value)
-              case _ => Failure(new Exception("Wrong attribute type"))
-            }
-        }
-      implicit def attrMapAsMap(
-          attributeValue: AttributeValue): Map[String, AttributeValue] =
-        attributeValue match {
-          case AttributeValueMap(value) => value
-        }
 
-      val d = EffectfulDecoder[AttributeValue, Outer](
-        Map("s" -> AttributeValueMap(
-          Map("i" -> AttributeValue(123),
-              "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello"))))))
+      val d = Decoder[AttributeValue, Outer](
+        Map(
+          "s" -> AttributeValueMap(
+            Map("i" -> AttributeValue(123),
+                "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello"))))))
       )
-      d must_== Success(Outer(Simple(123, Inner("hello"))))
+      d must beRight(Outer(Simple(123, Inner("hello"))))
     }
   }
-}*/
+  "Encoder should" >> {
+    "encode case classes" >> {
+      case class Inner(j: String)
+      case class Simple(i: Int, n: Inner)
+      case class Outer(s: Simple)
+
+      val e = Encoder[Outer, AttributeValue].encode(
+        Outer(Simple(123, Inner("hello"))))
+      e must beRight(
+        Map("s" -> AttributeValueMap(
+          Map("i" -> AttributeValue(123),
+              "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello")))))))
+    }
+    "encode ADTs" >> {
+      sealed trait ADT
+      case class A(a: String) extends ADT
+      case class B(b: String) extends ADT
+      case class Outer(a: ADT, b: ADT) extends ADT
+      val res = Encoder[Outer, AttributeValue].encode(Outer(A("AAA"), B("BBB")))
+      res must beRight(
+        Map("a" -> AttributeValueMap(Map("a" -> AttributeValueString("AAA"))),
+            "b" -> AttributeValueMap(Map("b" -> AttributeValueString("BBB")))))
+    }
+  }
+}

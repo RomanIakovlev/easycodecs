@@ -14,8 +14,9 @@ import scala.collection.mutable
 trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
 
   def awsDecoder[A](m: Map[String, aws.AttributeValue])(
-    implicit d: Decoder[aws.AttributeValue, A]): Either[DecodingError, A] =
+    implicit d: Decoder[aws.AttributeValue, A]): Either[DecodingError, A] = {
     d.decode(m)
+  }
 
   def instance[A](f: (aws.AttributeValue) => A)
     : PrimitivesExtractor[aws.AttributeValue, A] =
@@ -63,7 +64,7 @@ trait AwsAttributeValueDecoder extends Extractors[aws.AttributeValue] {
           c.result()
         }
       }.leftMap {
-        case t: Throwable => new ExtractionError(t)
+        t: Throwable => new ExtractionError(t)
       }
     }
 

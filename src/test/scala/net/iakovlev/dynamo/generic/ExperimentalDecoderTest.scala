@@ -2,7 +2,7 @@ package net.iakovlev.dynamo.generic
 
 import org.specs2.mutable.Specification
 
-class ExperimentalDecoderTest extends Specification {
+class OptionalDecoderTest extends Specification {
   "Experimental generic decoder derivation facility should" >> {
     "Use custom decoder" >> {
       case class Test(s: List[Int])

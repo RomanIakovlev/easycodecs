@@ -3,8 +3,8 @@ val commonSettings =
   Seq(organization := "net.iakovlev",
       scalaVersion := "2.11.8",
       scalacOptions in Test ++= Seq("-Yrangepos"),
-      libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.6" % "test"/*,
-        compilerPlugin("tryp" %% "splain" % "0.1.22")*/))
+      libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.8.6" % "test",
+        compilerPlugin("tryp" %% "splain" % "0.1.22")))
 
 lazy val core = (project in file("."))
   .settings(commonSettings)
@@ -27,7 +27,7 @@ lazy val aws_sdk_bindings =
     .dependsOn(core)
     .configs(IntegrationTest)
     .settings(
-      //scalacOptions ++= Seq("-Xlog-implicits"),
+      scalacOptions ++= Seq("-Xlog-implicits"),
       Defaults.itSettings,
       name := "Dynamo Java SDK bindings",
       libraryDependencies ++= Seq(
