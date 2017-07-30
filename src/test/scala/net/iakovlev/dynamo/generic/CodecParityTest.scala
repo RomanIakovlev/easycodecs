@@ -10,70 +10,44 @@ class CodecParityTest extends Specification {
         List(AttributeValueInt(1), AttributeValueInt(2), AttributeValueInt(3))))
       val original = C(Vector(1, 2, 3))
       val decoded = Decoder[AttributeValue, C].decode(translation)
-      println("!!! decoded " + decoded)
-      decoded must beRight(original)
       val encoded = Encoder[C, AttributeValue].encode(original)
-      println("!!! encoded " + encoded)
+      decoded must beRight(original)
       encoded must beRight(translation)
     }
-  }
-  /*"Decoder should" >> {
-    "decode case classes" >> {
-      case class Inner(j: String)
-      case class Simple(i: Int, n: Inner)
-      case class Outer(s: Simple)
-
-      val d = Decoder[AttributeValue, Outer](
-        Map(
-          "s" -> AttributeValueMap(
-            Map("i" -> AttributeValue(123),
-                "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello"))))))
-      )
-      d must beRight(Outer(Simple(123, Inner("hello"))))
-    }
-    "decode collections" >> {
-
-    }
-  }
-  "Encoder should" >> {
-    "encode simple case classes" >> {
+    "simple case classes" >> {
       case class I(i: Int)
-      Encoder[I, AttributeValue].encode(I(5)) should beRight(
-        Map("i" -> AttributeValueInt(5)))
+      val original = I(5)
+      val translation = Map("i" -> AttributeValueInt(5))
+      val encoded = Encoder[I, AttributeValue].encode(original)
+      val decoded = Decoder[AttributeValue, I].decode(translation)
+      decoded must beRight(original)
+      encoded must beRight(translation)
     }
-    "encode case classes" >> {
+    "case classes" >> {
       case class Inner(j: String)
       case class Simple(i: Int, n: Inner)
       case class Outer(s: Simple)
-
-      val e = Encoder[Outer, AttributeValue].encode(
-        Outer(Simple(123, Inner("hello"))))
-      e must beRight(
-        Map("s" -> AttributeValueMap(
-          Map("i" -> AttributeValue(123),
-              "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello")))))))
+      val original = Outer(Simple(123, Inner("hello")))
+      val translation = Map("s" -> AttributeValueMap(
+        Map("i" -> AttributeValue(123),
+          "n" -> AttributeValueMap(Map("j" -> AttributeValue("hello"))))))
+      val encoded = Encoder[Outer, AttributeValue].encode(original)
+      val decoded = Decoder[AttributeValue, Outer].decode(translation)
+      decoded must beRight(original)
+      encoded must beRight(translation)
     }
-    "encode ADTs" >> {
+    "ADTs" >> {
       sealed trait ADT
       case class A(a: String) extends ADT
       case class B(b: String) extends ADT
       case class Outer(a: ADT, b: ADT) extends ADT
-      val res = Encoder[Outer, AttributeValue].encode(Outer(A("AAA"), B("BBB")))
-      res must beRight(
-        Map("a" -> AttributeValueMap(Map("a" -> AttributeValueString("AAA"))),
-            "b" -> AttributeValueMap(Map("b" -> AttributeValueString("BBB")))))
+      val original = Outer(A("AAA"), B("BBB"))
+      val translation = Map("a" -> AttributeValueMap(Map("a" -> AttributeValueString("AAA"))),
+        "b" -> AttributeValueMap(Map("b" -> AttributeValueString("BBB"))))
+      val encoded = Encoder[Outer, AttributeValue].encode(original)
+      val decoded = Decoder[AttributeValue, Outer].decode(translation)
+      decoded must beRight(original)
+      encoded must beRight(translation)
     }
-    "encode primitives collections" >> {
-      case class C(l: Vector[Int])
-      val res = Encoder[C, AttributeValue].encode(C(Vector(1, 2, 3)))
-      println("!!!!!!!!!!!!" + res)
-      res must beRight(
-        Map(
-          "l" -> AttributeValueList(
-            List(AttributeValueInt(1),
-                 AttributeValueInt(2),
-                 AttributeValueInt(3))))
-      )
-    }
-  }*/
+  }
 }
