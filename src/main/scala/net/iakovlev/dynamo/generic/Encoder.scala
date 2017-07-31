@@ -3,11 +3,11 @@ package net.iakovlev.dynamo.generic
 import cats.syntax.either._
 import cats.instances.either._
 import cats.syntax.cartesian._
-import shapeless.{:+:, _}
-import shapeless.labelled.{FieldType, _}
+import shapeless._
+import shapeless.labelled.FieldType
 
 import scala.collection.generic.CanBuildFrom
-import scala.language.higherKinds
+import scala.language.{existentials, higherKinds}
 import scala.util.{Left, Right}
 import scala.util.control.NoStackTrace
 
@@ -65,6 +65,13 @@ object SingleFieldEncoder {
         f(a)
       }
     }
+  implicit def encodeEnum[A, ARepr <: Coproduct, B](
+      implicit e: PrimitivesWriter[String, B],
+      lg: LabelledGeneric.Aux[A, ARepr],
+      isEnum: IsEnum[ARepr]): SingleFieldEncoder[A, B] =
+    instance { a =>
+      Right(e.write(isEnum.to(lg.to(a))))
+    }
   implicit def traversableWriterEncoder[A, B, C[X] <: Traversable[X]](
       implicit cbf: CanBuildFrom[C[B], B, C[B]],
       ae: SingleFieldEncoder[A, B],
@@ -82,32 +89,46 @@ object SingleFieldEncoder {
           }
         } match {
           case Some(x) => Left(x)
-          case None => Right(w.write(c.result()))
+          case None    => Right(w.write(c.result()))
         }
       }
     }
-
+  implicit def optionEncoder[A, B](
+      implicit e: SingleFieldEncoder[A, B]): SingleFieldEncoder[Option[A], B] =
+    instance {
+      case Some(x) => e.encode(x)
+      case None    => Left(new OtherEncodingError)
+    }
   implicit def coproductEncoder[A, B](
       implicit e: CoproductEncoder[A, B],
       lp: LowPriority): SingleFieldEncoder[A, B] =
     instance { a =>
-      println("coproductEncoder")
       e.encode(a)
     }
   implicit def classAsMapEncoder[A, B](
       implicit e: Encoder[A, B],
       w: PrimitivesWriter[Map[String, B], B]): SingleFieldEncoder[A, B] =
     instance { a =>
-      println("classAsMapEncoder")
       for {
         b <- e.encode(a)
       } yield w.write(b)
+    }
+  implicit def mapAsMapEncoder[A, B](
+      implicit e: SingleFieldEncoder[A, B],
+      w: PrimitivesWriter[Map[String, B], B]
+  ): SingleFieldEncoder[Map[String, A], B] =
+    instance { a =>
+      import cats.instances.map._
+      import cats.syntax.traverse._
+      val o: Either[EncodingError, B] = for {
+        r <- a.traverseU(e.encode)
+      } yield w.write(r)
+      o
     }
   implicit def primitivesEncoder[A, B](
       implicit primitivesWriter: PrimitivesWriter[A, B])
     : SingleFieldEncoder[A, B] =
     instance { a =>
-      println("primitivesEncoder")
       Right(primitivesWriter.write(a))
     }
 
@@ -121,19 +142,42 @@ object Encoder {
 
   type Result[A] = Either[EncodingError, Map[String, A]]
 
-  implicit def encodeHNil[A]: Encoder[HNil, A] =
-    new Encoder[HNil, A] {
-      override def encode(a: HNil): Result[A] = Right(Map.empty)
+  def instance[A, B](f: A => Result[B]): Encoder[A, B] =
+    new Encoder[A, B] {
+      override def encode(a: A): Either[EncodingError, Map[String, B]] = f(a)
     }
+
+  implicit def encodeHNil[A]: Encoder[HNil, A] =
+    instance { _ =>
+      Right(Map.empty)
+    }
+
+  // "H =:= Option[X] forSome { type X }" and "LowPriority" in Encoder#encodeHCons seems to be
+  // the only way to guide implicit solver correctly :(
+  implicit def encodeHConsOpt[A, K <: Symbol, H, T <: HList](
+      implicit eh: SingleFieldEncoder[H, A],
+      et: Lazy[Encoder[T, A]],
+      ev: H =:= Option[X] forSome { type X },
+      k: Witness.Aux[K]): Encoder[FieldType[K, H] :: T, A] =
+    instance { a =>
+      ev(a.head) match {
+        case Some(_) =>
+          (et.value.encode(a.tail) |@| eh.encode(a.head)).map { (t, h) =>
+            t + (k.value.name -> h)
+          }
+        case None =>
+          et.value.encode(a.tail)
+      }
+    }
+  // LowPriority to allow for Encoder#encodeHConsOpt to take over when H is Option
   implicit def encodeHCons[A, K <: Symbol, H, T <: HList](
       implicit eh: SingleFieldEncoder[H, A],
       et: Lazy[Encoder[T, A]],
-      k: Witness.Aux[K]): Encoder[FieldType[K, H] :: T, A] =
-    new Encoder[FieldType[K, H] :: T, A] {
-      override def encode(a: FieldType[K, H] :: T): Result[A] = {
-        (et.value.encode(a.tail) |@| eh.encode(a.head)).map { (t, h) =>
-          t + (k.value.name -> h)
-        }
+      k: Witness.Aux[K],
+      lp: LowPriority): Encoder[FieldType[K, H] :: T, A] =
+    instance { a =>
+      (et.value.encode(a.tail) |@| eh.encode(a.head)).map { (t, h) =>
+        t + (k.value.name -> h)
       }
     }
   // LowPriority and Strict to allow for SingleFieldEncoder#classAsMapEncoder to take over
@@ -141,10 +185,8 @@ object Encoder {
       implicit lg: LabelledGeneric.Aux[A, LabelledRepr],
       e: Strict[Encoder[LabelledRepr, B]],
       lp: LowPriority): Encoder[A, B] =
-    new Encoder[A, B] {
-      override def encode(a: A): Result[B] = {
-        e.value.encode(lg.to(a))
-      }
+    instance { a =>
+      e.value.encode(lg.to(a))
     }
 
   def apply[A, B](implicit e: Encoder[A, B]): Encoder[A, B] = e
