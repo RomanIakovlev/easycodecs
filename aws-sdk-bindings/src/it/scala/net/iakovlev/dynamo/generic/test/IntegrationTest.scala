@@ -1,21 +1,31 @@
 package net.iakovlev.dynamo.generic.test
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClient, model => aws}
+import cats.implicits._
+import com.amazonaws.client.builder.AwsClientBuilder
 import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.dynamodbv2.model._
-import net.iakovlev.dynamo.generic.{AwsAttributeValueDecoder, AwsSdkBindings, SingleFieldEffectfulDecoder}
+import com.amazonaws.services.dynamodbv2.{
+  AmazonDynamoDBClientBuilder,
+  model => aws
+}
+import net.iakovlev.dynamo.generic.{AwsAttributeValueDecoder, AwsSdkBindings}
 import org.specs2.mutable.Specification
-
-import scala.collection.JavaConverters._
-import cats.implicits._
 import org.specs2.specification.BeforeAfterAll
 
-import scala.util.{Failure, Success, Try}
+import scala.collection.JavaConverters._
 
-class IntegrationTest extends Specification with AwsAttributeValueDecoder with BeforeAfterAll {
+class IntegrationTest
+    extends Specification
+    with AwsAttributeValueDecoder
+    with BeforeAfterAll {
 
-  val dynamoDB = new AmazonDynamoDBClient
-  val dynamoDBHelper = new DynamoDB(dynamoDB)
-  val tableName = "dynamo-generic-test"
+  private val dynamoDB = AmazonDynamoDBClientBuilder
+    .standard()
+    .withEndpointConfiguration(
+      new AwsClientBuilder.EndpointConfiguration("http://localhost:8000",
+                                                 "us-west-2"))
+    .build()
+  private val dynamoDBHelper = new DynamoDB(dynamoDB)
+  private val tableName = "dynamo-generic-test"
   override def beforeAll(): Unit = {
 
     println(s"Creating the table $tableName")
@@ -28,7 +38,8 @@ class IntegrationTest extends Specification with AwsAttributeValueDecoder with B
       List(
         new KeySchemaElement("hashKey", KeyType.HASH),
         new KeySchemaElement("rangeKey", KeyType.RANGE)
-      ).asJava, new ProvisionedThroughput(5l, 5l)
+      ).asJava,
+      new ProvisionedThroughput(5l, 5l)
     )
 
     val table = dynamoDBHelper.createTable(createTableRequest)
@@ -43,61 +54,86 @@ class IntegrationTest extends Specification with AwsAttributeValueDecoder with B
     println(s"Table $tableName is deleted")
   }
 
+  def attr() = new aws.AttributeValue()
+  def attr(s: String) = new aws.AttributeValue(s)
+
   "Generic AWS SDK bindings should be able to" >> {
-    "decode nested case classes" >> {
+    "do full cycle codec on nested case classes" >> {
+
       case class Inner(j: String)
       case class Nested(i: Int, p: Inner)
-      case class Outer(n: Nested, hashKey: String, rangeKey: String)
+      case class DynamoItem(n: Nested, hashKey: String, rangeKey: String)
 
-      val keys = Map(
-        "hashKey" -> new aws.AttributeValue("2"),
-        "rangeKey" -> new aws.AttributeValue("2"))
-
-      dynamoDB.putItem(tableName,
-        (keys + (
-          "n" -> new aws.AttributeValue()
-            .addMEntry("i", new aws.AttributeValue().withN("10"))
-            .addMEntry("p", new aws.AttributeValue()
-              .addMEntry("j", new aws.AttributeValue().withS("hello"))))).asJava)
-
-      val req = new GetItemRequest("dynamo-generic-test", keys.asJava, true)
-      val resp = dynamoDB.getItem(req)
-      val decoded = AwsSdkBindings.monadic[Outer](resp)
-      decoded match {
-        case Success(r) => r must_== Outer(Nested(10, Inner("hello")), "2", "2")
-        case Failure(ex) =>
-          ex.printStackTrace()
+      val original = DynamoItem(Nested(3, Inner("hello")), "2", "2")
+      val i = for {
+        encoded <- AwsSdkBindings.encode[DynamoItem](original)
+      } yield {
+        dynamoDB.putItem(encoded.withTableName(tableName))
       }
-      println(decoded)
-      decoded must_== Success(Outer(Nested(10, Inner("hello")), "2", "2"))
-    }
-    "read data from real table" >> {
+      i must beRight
+      val hk = "2"
+      val rk = "2"
+      val keys = Map("hashKey" -> attr(hk), "rangeKey" -> attr(rk))
 
-      dynamoDB.putItem(tableName,
+      val req = new GetItemRequest(tableName, keys.asJava, true)
+      val resp = dynamoDB.getItem(req)
+      val decoded = AwsSdkBindings.decode[DynamoItem](resp)
+      decoded must beRight(original)
+    }
+    "read hand-written data" >> {
+
+      dynamoDB.putItem(
+        tableName,
         Map(
           "hashKey" -> new aws.AttributeValue("1"),
           "rangeKey" -> new aws.AttributeValue().withS("2"),
           "numList" -> new aws.AttributeValue().withL(
             new aws.AttributeValue().withN("10"),
             new aws.AttributeValue().withN("20"),
-            new aws.AttributeValue().withN("30"))).asJava)
+            new aws.AttributeValue().withN("30"))
+        ).asJava
+      )
 
-      val keys = Map(
-        "hashKey" -> new aws.AttributeValue("1"),
-        "rangeKey" -> new aws.AttributeValue().withS("2"))
-      val req = new GetItemRequest("dynamo-generic-test", keys.asJava, true)
+      val keys = Map("hashKey" -> new aws.AttributeValue("1"),
+                     "rangeKey" -> new aws.AttributeValue().withS("2"))
+      val req = new GetItemRequest(tableName, keys.asJava, true)
       val resp = dynamoDB.getItem(req)
 
       case class NumList(hashKey: String, rangeKey: String, numList: List[Int])
-      val decoded = AwsSdkBindings.monadic[NumList](resp)
+      val decoded = AwsSdkBindings.decode[NumList](resp)
       println(decoded)
-      decoded must_== Success(NumList("1", "2", List(10, 20, 30)))
-
-      case class NumList1(hashKey: String, rangeKey: String)
-      val decoded1 = AwsSdkBindings.monadic[NumList1](resp)
-      println(decoded1)
-      decoded1 must_== Success(NumList1("1", "2"))
+      decoded must beRight(NumList("1", "2", List(10, 20, 30)))
     }
 
+    "write data" >> {
+      val hk = "23"
+      val rk = "23"
+      val keys = Map("hashKey" -> attr(hk), "rangeKey" -> attr(rk))
+
+      case class Inner(j: String)
+      case class Nested(i: Int, p: Inner)
+      case class DynamoItem(n: Nested, hashKey: String, rangeKey: String)
+
+      val original = DynamoItem(Nested(10, Inner("hello")), hk, rk)
+      val i = for {
+        encoded <- AwsSdkBindings.encode[DynamoItem](original)
+      } yield {
+        dynamoDB.putItem(encoded.withTableName(tableName))
+      }
+      i must beRight
+
+      val req = new GetItemRequest(tableName, keys.asJava, true)
+      val resp = dynamoDB.getItem(req)
+
+      val expected =
+        Map(
+          "rangeKey" -> attr().withS("23"),
+          "hashKey" -> attr().withS("23"),
+          "n" -> attr()
+            .addMEntry("i", attr().withN("10"))
+            .addMEntry("p", attr().addMEntry("j", attr().withS("hello")))
+        )
+      resp.getItem.asScala must_== expected
+    }
   }
 }
