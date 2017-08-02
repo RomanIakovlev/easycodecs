@@ -6,13 +6,19 @@ val commonSettings =
     scalaVersion := "2.12.3",
     crossScalaVersions := Seq("2.11.11", "2.12.3"),
     scalacOptions in Test ++= Seq("-Yrangepos"),
-    libraryDependencies ++= Seq(compilerPlugin("io.tryp" %% "splain" % "0.2.4"))
+    libraryDependencies ++= Seq(compilerPlugin("io.tryp" %% "splain" % "0.2.4")),
+    publishTo := Some(
+      if (isSnapshot.value)
+        Opts.resolver.sonatypeSnapshots
+      else
+        Opts.resolver.sonatypeStaging
+    )
   )
 
 lazy val core = (project in file("."))
   .settings(commonSettings)
   .settings(
-    name := "dynamo-generic-core",
+    name := "easycodecs-core",
     //scalacOptions ++= Seq("-Xlog-implicits"),
     libraryDependencies ++= Seq(
       "com.chuusai" %% "shapeless" % "2.3.2",
@@ -28,7 +34,7 @@ lazy val aws_sdk_bindings =
     .settings(
       inConfig(IntegrationTest)(baseDynamoDBSettings),
       Defaults.itSettings,
-      name := "Dynamo Java SDK bindings",
+      name := "easycodecs-aws-dynamodb-bindings",
       libraryDependencies ++= Seq(
         "com.amazonaws" % "aws-java-sdk-dynamodb" % "1.11.171",
         "org.typelevel" %% "cats" % Versions.cats,
