@@ -12,7 +12,7 @@ import cats.implicits._
 import scala.collection.mutable
 
 trait AwsAttributeValueDecoder
-    extends Extractors[aws.AttributeValue]
+    extends Readers[aws.AttributeValue]
     with Writers[aws.AttributeValue] {
 
   def awsDecoder[A](m: Map[String, aws.AttributeValue])(
@@ -21,41 +21,41 @@ trait AwsAttributeValueDecoder
   }
 
   def instance[A](f: (aws.AttributeValue) => A)
-    : PrimitivesExtractor[aws.AttributeValue, A] =
-    new PrimitivesExtractor[aws.AttributeValue, A] {
+    : PrimitivesReader[aws.AttributeValue, A] =
+    new PrimitivesReader[aws.AttributeValue, A] {
       override def extract(a: aws.AttributeValue): Either[DecodingError, A] =
         Either.catchNonFatal(f(a)).leftMap(e => new ExtractionError(e))
     }
 
-  implicit def extractInt: PrimitivesExtractor[aws.AttributeValue, Int] =
+  implicit def readInt: PrimitivesReader[aws.AttributeValue, Int] =
     instance(_.getN.toInt)
 
-  implicit def extractLong: PrimitivesExtractor[aws.AttributeValue, Long] =
+  implicit def readLong: PrimitivesReader[aws.AttributeValue, Long] =
     instance(_.getN.toLong)
 
-  implicit def extractBoolean
-    : PrimitivesExtractor[aws.AttributeValue, Boolean] =
+  implicit def readBoolean
+    : PrimitivesReader[aws.AttributeValue, Boolean] =
     instance(_.getBOOL)
 
-  implicit def extractFloat: PrimitivesExtractor[aws.AttributeValue, Float] =
+  implicit def readFloat: PrimitivesReader[aws.AttributeValue, Float] =
     instance(_.getN.toFloat)
 
-  implicit def extractDouble: PrimitivesExtractor[aws.AttributeValue, Double] =
+  implicit def readDouble: PrimitivesReader[aws.AttributeValue, Double] =
     instance(_.getN.toDouble)
 
-  implicit def extractBigDecimal
-    : PrimitivesExtractor[aws.AttributeValue, BigDecimal] =
+  implicit def readBigDecimal
+    : PrimitivesReader[aws.AttributeValue, BigDecimal] =
     instance(a => BigDecimal(a.getN))
 
-  implicit def extractString: PrimitivesExtractor[aws.AttributeValue, String] =
+  implicit def readString: PrimitivesReader[aws.AttributeValue, String] =
     instance(a => Option(a.getS).get)
 
-  implicit def extractSeq[C[X] <: Iterable[X]](
+  implicit def readIterable[C[X] <: Iterable[X]](
       implicit cbf: CanBuildFrom[C[aws.AttributeValue],
                                  aws.AttributeValue,
                                  C[aws.AttributeValue]]
-  ): PrimitivesExtractor[aws.AttributeValue, C[aws.AttributeValue]] =
-    new PrimitivesExtractor[aws.AttributeValue, C[aws.AttributeValue]] {
+  ): PrimitivesReader[aws.AttributeValue, C[aws.AttributeValue]] =
+    new PrimitivesReader[aws.AttributeValue, C[aws.AttributeValue]] {
       override def extract(a: aws.AttributeValue)
         : Either[DecodingError, C[aws.AttributeValue]] = {
         val c = cbf()
@@ -68,8 +68,8 @@ trait AwsAttributeValueDecoder
       }
     }
 
-  implicit def extractMap
-    : PrimitivesExtractor[aws.AttributeValue, Map[String, aws.AttributeValue]] =
+  implicit def readMap
+    : PrimitivesReader[aws.AttributeValue, Map[String, aws.AttributeValue]] =
     instance(a => a.getM.asScala.toMap)
 
   def writerInstance[A](
@@ -105,7 +105,7 @@ trait AwsAttributeValueDecoder
     : PrimitivesWriter[String, aws.AttributeValue] =
     writerInstance(a => new aws.AttributeValue().withS(a))
 
-  override implicit def writeSeq[C[X] <: Iterable[X]](
+  override implicit def writeIterable[C[X] <: Iterable[X]](
       implicit canBuildFrom: CanBuildFrom[C[aws.AttributeValue],
                                           aws.AttributeValue,
                                           C[aws.AttributeValue]])

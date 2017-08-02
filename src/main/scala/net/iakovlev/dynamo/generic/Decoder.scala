@@ -17,8 +17,8 @@ class OtherError extends DecodingError
 
 import Decoder.Result
 
-trait PrimitivesExtractor[S, A] {
-  def extract(a: S): Either[DecodingError, A]
+trait PrimitivesReader[A, B] {
+  def extract(a: A): Either[DecodingError, B]
 }
 
 trait SingleFieldEffectfulDecoder[S, A] {
@@ -37,7 +37,7 @@ object SingleFieldEffectfulDecoder {
 
   implicit def mapAsClassDecoder[S, A](
       implicit d: Decoder[S, A],
-      ext: PrimitivesExtractor[S, Map[String, S]])
+      ext: PrimitivesReader[S, Map[String, S]])
     : SingleFieldEffectfulDecoder[S, A] =
     instance { a =>
       for {
@@ -49,7 +49,7 @@ object SingleFieldEffectfulDecoder {
 
   implicit def mapAsMapDecoder[S, A](
       implicit d: SingleFieldEffectfulDecoder[S, A],
-      ext: PrimitivesExtractor[S, Map[String, S]])
+      ext: PrimitivesReader[S, Map[String, S]])
     : SingleFieldEffectfulDecoder[S, Map[String, A]] =
     instance { a =>
       val z: Either[DecodingError, Either[DecodingError, Map[String, A]]] =
@@ -67,7 +67,7 @@ object SingleFieldEffectfulDecoder {
   implicit def traversableExtractorDecoder[S, A, C[X] <: Traversable[X]](
       implicit cbf: CanBuildFrom[C[A], A, C[A]],
       ad: SingleFieldEffectfulDecoder[S, A],
-      ext: PrimitivesExtractor[S, C[S]]): SingleFieldEffectfulDecoder[S, C[A]] =
+      ext: PrimitivesReader[S, C[S]]): SingleFieldEffectfulDecoder[S, C[A]] =
     new SingleFieldEffectfulDecoder[S, C[A]] {
       override def decode(
           a: Either[DecodingError, S]): Either[DecodingError, C[A]] = {
@@ -91,7 +91,7 @@ object SingleFieldEffectfulDecoder {
       }
     }
 
-  implicit def extractorDecoder[S, A](implicit ext: PrimitivesExtractor[S, A])
+  implicit def extractorDecoder[S, A](implicit ext: PrimitivesReader[S, A])
     : SingleFieldEffectfulDecoder[S, A] =
     new SingleFieldEffectfulDecoder[S, A] {
       override def decode(

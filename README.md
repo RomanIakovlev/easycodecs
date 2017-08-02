@@ -27,12 +27,12 @@ Many Scala libraries provide generic codec typeclasses for their own data types.
 
 ##Implementation details
 
-The core typeclasses supporting the mapping between Scala classes and recursive map-like data types are `Encoder` and `Decoder` (collectively as codecs). `Encoder` converts a Scala class instance to data item, and `Decoder` converts a data item into a Scala class instance. The other typeclasses supporting concrete data types are called `PrimitivesExtractor` and `PrimitivesWriter`. `PrimitivesExtractor` can read Scala primitive values (e.g. `Int`, `String`, collections) from a single data item. `PrimitivesWriter` can create a single data item from a Scala primitive value.
+The core typeclasses supporting the mapping between Scala classes and recursive map-like data types are `Encoder` and `Decoder` (collectively as codecs). `Encoder` converts a Scala class instance to data item, and `Decoder` converts a data item into a Scala class instance. The other typeclasses supporting concrete data types are called `PrimitivesReader` and `PrimitivesWriter`. `PrimitivesReader` can read Scala primitive values (e.g. `Int`, `String`, collections) from a single data item. `PrimitivesWriter` can create a single data item from a Scala primitive value.
 
 Such approach have the following benefits:
 
 * All the heavy lifting is done once, in the `Encoder` and `Decoder` typeclasses. No need to have different codecs for e.g. DynamoDB and Cassandra.
-* By writing new `PrimitivesExtractor` and `PrimitivesWriter` instances, one can add support for new map-like data types.
+* By writing new `PrimitivesReader` and `PrimitivesWriter` instances, one can add support for new map-like data types.
 
 You can find the definitions of typeclasses used in this project below:
 
@@ -48,11 +48,11 @@ trait Decoder[A, B] {
   def decode(a: Map[String, A]): Either[DecodingError, B]
 }
 ```
-`PrimitivesExtractor`: 
+`PrimitivesReader`: 
 
 ```scala
-trait PrimitivesExtractor[S, A] {
-  def extract(a: S): Either[DecodingError, A]
+trait PrimitivesReader[A, B] {
+  def extract(a: A): Either[DecodingError, B]
 }
 ```
 `PrimitivesWriter`:
@@ -76,7 +76,7 @@ Codecs can be derived for the following Scala types:
 The generic derivation of `Encoder` and `Decoder` is implemented using pure [shapeless](https://github.com/milessabin/shapeless), with no custom macros.
 
 ##Project structure
-This project is a multi-project SBT build with the following structure: there is a `core` project, where all typeclasses are defined. `Encoder` and `Decoder` are also implemented there. Then there are additional projects providing implementations of `PrimitivesExtractor` and `PrimitivesWriter` for concrete data types (e.g. DynamoDB's `AttributeValue`). Those additional projects depend on `core` for `PrimitivesExtractor` and `PrimitivesWriter` definitions.
+This project is a multi-project SBT build with the following structure: there is a `core` project, where all typeclasses are defined. `Encoder` and `Decoder` are also implemented there. Then there are additional projects providing implementations of `PrimitivesReader` and `PrimitivesWriter` for concrete data types (e.g. DynamoDB's `AttributeValue`). Those additional projects depend on `core` for `PrimitivesReader` and `PrimitivesWriter` definitions.
 
 Currently, one data type is supported, namely DynamoDB's [AttributeValue](http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/dynamodbv2/model/AttributeValue.html) from AWS Java SDK v1.x.
 
@@ -84,11 +84,8 @@ Currently, one data type is supported, namely DynamoDB's [AttributeValue](http:/
 
 This project has started as an attempt to learn how to write generic codec derivation for DynamoDB records. However, during implementation I've understood this problem can be generalized, and the project acquired its current scope. I personally feel excited about opportunities this approach provides, and I hope others will feel the same. However, I'm aware of the [law of the leaky abstractions](https://www.joelonsoftware.com/2002/11/11/the-law-of-leaky-abstractions/), and therefore I'm sure further usage of this approach, especially by someone other than me, will uncover its weaknesses. 
 
-Therefore, please use codecs from this project, submit support for new codecs (see [Contributing](./#Contributing)), and share your experience. 
+Therefore, please use codecs from this project, submit support for new codecs (see [Contributing](../CONTRIBUTING)), and share your experience. 
 
-##Contributing
-
-To add support for a new data type, create a new project and implement `PrimitivesExtractor` and `PrimitivesWriter` instances for this new type in it. The easiest way to provide all the necessary instances is to implement `Extractors` and `Writers` traits. Use existing projects as guidance.
 
 ##License
 Apache License 2.0

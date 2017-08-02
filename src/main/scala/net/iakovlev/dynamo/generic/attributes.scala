@@ -42,62 +42,62 @@ object AttributeValue extends AttributeValueBindings {
 }
 
 trait AttributeValueBindings
-    extends Extractors[AttributeValue]
+    extends Readers[AttributeValue]
     with Writers[AttributeValue] {
 
   def extractorInstance[A](
-      f: (AttributeValue) => A): PrimitivesExtractor[AttributeValue, A] =
-    new PrimitivesExtractor[AttributeValue, A] {
+      f: (AttributeValue) => A): PrimitivesReader[AttributeValue, A] =
+    new PrimitivesReader[AttributeValue, A] {
       override def extract(a: AttributeValue): Either[DecodingError, A] =
         Either.catchNonFatal(f(a)).leftMap(e => new ExtractionError(e))
     }
 
-  override implicit def extractInt: PrimitivesExtractor[AttributeValue, Int] =
+  override implicit def readInt: PrimitivesReader[AttributeValue, Int] =
     extractorInstance {
       case a: AttributeValueInt => a.value
     }
 
-  override implicit def extractLong: PrimitivesExtractor[AttributeValue, Long] =
+  override implicit def readLong: PrimitivesReader[AttributeValue, Long] =
     extractorInstance {
       case a: AttributeValueLong => a.value
     }
 
-  override implicit def extractFloat
-    : PrimitivesExtractor[AttributeValue, Float] =
+  override implicit def readFloat
+    : PrimitivesReader[AttributeValue, Float] =
     extractorInstance {
       case a: AttributeValueFloat => a.value
     }
 
-  override implicit def extractDouble
-    : PrimitivesExtractor[AttributeValue, Double] =
+  override implicit def readDouble
+    : PrimitivesReader[AttributeValue, Double] =
     extractorInstance {
       case a: AttributeValueDouble => a.value
     }
 
-  override implicit def extractBigDecimal
-    : PrimitivesExtractor[AttributeValue, BigDecimal] =
+  override implicit def readBigDecimal
+    : PrimitivesReader[AttributeValue, BigDecimal] =
     extractorInstance {
       case a: AttributeValueBigDecimal => a.value
     }
 
-  override implicit def extractBoolean
-    : PrimitivesExtractor[AttributeValue, Boolean] =
+  override implicit def readBoolean
+    : PrimitivesReader[AttributeValue, Boolean] =
     extractorInstance {
       case a: AttributeValueBoolean => a.value
     }
 
-  override implicit def extractString
-    : PrimitivesExtractor[AttributeValue, String] =
+  override implicit def readString
+    : PrimitivesReader[AttributeValue, String] =
     extractorInstance {
       case a: AttributeValueString => a.value
     }
 
-  override implicit def extractSeq[C[X] <: Iterable[X]](
+  override implicit def readIterable[C[X] <: Iterable[X]](
       implicit canBuildFrom: CanBuildFrom[C[AttributeValue],
                                           AttributeValue,
                                           C[AttributeValue]])
-    : PrimitivesExtractor[AttributeValue, C[AttributeValue]] =
-    new PrimitivesExtractor[AttributeValue, C[AttributeValue]] {
+    : PrimitivesReader[AttributeValue, C[AttributeValue]] =
+    new PrimitivesReader[AttributeValue, C[AttributeValue]] {
       override def extract(
           a: AttributeValue): Either[DecodingError, C[AttributeValue]] = {
         val c = canBuildFrom()
@@ -115,8 +115,8 @@ trait AttributeValueBindings
       }
     }
 
-  implicit override def extractMap
-    : PrimitivesExtractor[AttributeValue, Map[String, AttributeValue]] =
+  implicit override def readMap
+    : PrimitivesReader[AttributeValue, Map[String, AttributeValue]] =
     extractorInstance {
       case a: AttributeValueMap => a.value
     }
@@ -151,7 +151,7 @@ trait AttributeValueBindings
   override implicit def writeString: PrimitivesWriter[String, AttributeValue] =
     writerInstance(AttributeValueString)
 
-  override implicit def writeSeq[C[X] <: Iterable[X]](
+  override implicit def writeIterable[C[X] <: Iterable[X]](
       implicit canBuildFrom: CanBuildFrom[C[AttributeValue],
                                           AttributeValue,
                                           C[AttributeValue]])
