@@ -26,8 +26,8 @@ lazy val core = (project in file("."))
       "org.typelevel" %% "cats" % Versions.cats)
   )
 
-lazy val aws_sdk_bindings =
-  (project in file("aws-sdk-bindings"))
+lazy val aws_dynamodb_bindings =
+  (project in file("aws-dynamodb-bindings"))
     .settings(commonSettings)
     .dependsOn(core)
     .configs(IntegrationTest)
