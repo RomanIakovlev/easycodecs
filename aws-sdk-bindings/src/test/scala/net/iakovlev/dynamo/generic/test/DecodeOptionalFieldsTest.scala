@@ -1,7 +1,8 @@
 package net.iakovlev.dynamo.generic.test
 
 import com.amazonaws.services.dynamodbv2.{model => aws}
-import net.iakovlev.dynamo.generic.{AwsAttributeValueDecoder, ExtractionError}
+import net.iakovlev.dynamo.generic.AwsAttributeValueDecoder
+import net.iakovlev.easycodecs.decoder.ReadingError
 import org.specs2.mutable.Specification
 
 class DecodeOptionalFieldsTest
@@ -19,7 +20,7 @@ class DecodeOptionalFieldsTest
     val res3 =
       awsDecoder[Optional1](Map("o" -> new aws.AttributeValue("oeuo")))
     res3 must beLike {
-      case Left(_: ExtractionError) => ok
+      case Left(_: ReadingError) => ok
       case _ => ko("wrong exception type")
     }
   }

@@ -1,6 +1,6 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.easycodecs
 
-import shapeless.{:+:, CNil, Coproduct, Generic, HNil, Inl, Inr, Witness}
+import shapeless._
 import shapeless.labelled._
 
 /**

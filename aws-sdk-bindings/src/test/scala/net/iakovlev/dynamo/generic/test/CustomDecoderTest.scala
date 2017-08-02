@@ -1,17 +1,11 @@
 package net.iakovlev.dynamo.generic.test
 
-import net.iakovlev.dynamo.generic.{AwsAttributeValueDecoder, Decoder}
-import org.specs2.mutable.Specification
-import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClient, model => aws}
-import com.amazonaws.services.dynamodbv2.document.DynamoDB
-import com.amazonaws.services.dynamodbv2.model._
 import cats.implicits._
-import org.specs2.matcher.ValueCheck
-
-import scala.collection.JavaConverters._
-import scala.collection.generic.CanBuildFrom
-import scala.util.{Failure, Success, Try}
-import net.iakovlev.dynamo.generic.DecodingError
+import com.amazonaws.services.dynamodbv2.{model => aws}
+import net.iakovlev.dynamo.generic.AwsAttributeValueDecoder
+import net.iakovlev.easycodecs._
+import net.iakovlev.easycodecs.decoder.{Decoder, DecodingError}
+import org.specs2.mutable.Specification
 
 class CustomDecoderTest extends Specification with AwsAttributeValueDecoder {
   case class Test(s: List[Int])

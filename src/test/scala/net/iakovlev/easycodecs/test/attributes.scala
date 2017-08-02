@@ -1,5 +1,8 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.easycodecs.test
+
 import cats.syntax.either._
+import net.iakovlev.easycodecs.decoder._
+import net.iakovlev.easycodecs.encoder._
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
@@ -49,7 +52,7 @@ trait AttributeValueBindings
       f: (AttributeValue) => A): PrimitivesReader[AttributeValue, A] =
     new PrimitivesReader[AttributeValue, A] {
       override def extract(a: AttributeValue): Either[DecodingError, A] =
-        Either.catchNonFatal(f(a)).leftMap(e => new ExtractionError(e))
+        Either.catchNonFatal(f(a)).leftMap(e => new ReadingError(e))
     }
 
   override implicit def readInt: PrimitivesReader[AttributeValue, Int] =
@@ -110,7 +113,7 @@ trait AttributeValueBindings
             c.result()
           }
           .leftMap { t: Throwable =>
-            new ExtractionError(t)
+            new ReadingError(t)
           }
       }
     }

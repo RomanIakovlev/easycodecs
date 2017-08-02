@@ -1,5 +1,7 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.easycodecs.decoder
+
 import cats.implicits._
+import net.iakovlev.easycodecs.IsEnum
 import shapeless._
 import shapeless.labelled.{FieldType, field}
 
@@ -12,10 +14,10 @@ abstract sealed class DecodingError extends Throwable {
 }
 
 class MissingFieldError extends DecodingError
-class ExtractionError(val t: Throwable) extends DecodingError
+class ReadingError(val t: Throwable) extends DecodingError
 class OtherError extends DecodingError
 
-import Decoder.Result
+import net.iakovlev.easycodecs.decoder.Decoder.Result
 
 trait PrimitivesReader[A, B] {
   def extract(a: A): Either[DecodingError, B]
@@ -35,9 +37,8 @@ object SingleFieldEffectfulDecoder {
       }
     }
 
-  implicit def mapAsClassDecoder[S, A](
-      implicit d: Decoder[S, A],
-      ext: PrimitivesReader[S, Map[String, S]])
+  implicit def mapAsClassDecoder[S, A](implicit d: Decoder[S, A],
+                                       ext: PrimitivesReader[S, Map[String, S]])
     : SingleFieldEffectfulDecoder[S, A] =
     instance { a =>
       for {
@@ -91,8 +92,8 @@ object SingleFieldEffectfulDecoder {
       }
     }
 
-  implicit def extractorDecoder[S, A](implicit ext: PrimitivesReader[S, A])
-    : SingleFieldEffectfulDecoder[S, A] =
+  implicit def extractorDecoder[S, A](
+      implicit ext: PrimitivesReader[S, A]): SingleFieldEffectfulDecoder[S, A] =
     new SingleFieldEffectfulDecoder[S, A] {
       override def decode(
           a: Either[DecodingError, S]): Either[DecodingError, A] =

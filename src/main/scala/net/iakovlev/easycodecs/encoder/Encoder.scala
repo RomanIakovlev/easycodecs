@@ -1,15 +1,16 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.easycodecs.encoder
 
-import cats.syntax.either._
 import cats.instances.either._
 import cats.syntax.cartesian._
+import cats.syntax.either._
+import net.iakovlev.easycodecs._
 import shapeless._
 import shapeless.labelled.FieldType
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.{existentials, higherKinds}
-import scala.util.{Left, Right}
 import scala.util.control.NoStackTrace
+import scala.util.{Left, Right}
 
 abstract sealed class EncodingError extends Throwable with NoStackTrace
 

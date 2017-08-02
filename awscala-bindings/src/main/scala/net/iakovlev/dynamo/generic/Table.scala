@@ -1,7 +1,6 @@
 package net.iakovlev.dynamo.generic
 
 //import com.amazonaws.services.dynamodbv2.model.GetItemRequest
-import net.iakovlev.dynamo.generic.LensAndType.Aux
 import shapeless.tag.@@
 import shapeless.{HList, HNil, Lens, Path, Select, ^, lens, ::}
 

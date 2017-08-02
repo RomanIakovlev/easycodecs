@@ -3,10 +3,7 @@ import cats.implicits._
 import com.amazonaws.client.builder.AwsClientBuilder
 import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.dynamodbv2.model._
-import com.amazonaws.services.dynamodbv2.{
-  AmazonDynamoDBClientBuilder,
-  model => aws
-}
+import com.amazonaws.services.dynamodbv2.{AmazonDynamoDBClientBuilder, model => aws}
 import net.iakovlev.dynamo.generic.{AwsAttributeValueDecoder, AwsSdkBindings}
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll

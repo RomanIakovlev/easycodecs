@@ -1,5 +1,7 @@
-package net.iakovlev.dynamo.generic
+package net.iakovlev.easycodecs.test
 
+import net.iakovlev.easycodecs.decoder.Decoder
+import net.iakovlev.easycodecs.encoder.Encoder
 import org.specs2.mutable.Specification
 
 class CodecParityTest extends Specification {

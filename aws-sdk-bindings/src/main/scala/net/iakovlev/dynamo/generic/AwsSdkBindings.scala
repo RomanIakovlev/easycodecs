@@ -6,10 +6,9 @@ import com.amazonaws.services.dynamodbv2.{model => aws}
 import scala.collection.JavaConverters._
 import scala.collection.generic._
 import scala.language.higherKinds
-import scala.util.Try
 import cats.implicits._
-
-import scala.collection.mutable
+import net.iakovlev.easycodecs.decoder._
+import net.iakovlev.easycodecs.encoder._
 
 trait AwsAttributeValueDecoder
     extends Readers[aws.AttributeValue]
@@ -24,7 +23,7 @@ trait AwsAttributeValueDecoder
     : PrimitivesReader[aws.AttributeValue, A] =
     new PrimitivesReader[aws.AttributeValue, A] {
       override def extract(a: aws.AttributeValue): Either[DecodingError, A] =
-        Either.catchNonFatal(f(a)).leftMap(e => new ExtractionError(e))
+        Either.catchNonFatal(f(a)).leftMap(e => new ReadingError(e))
     }
 
   implicit def readInt: PrimitivesReader[aws.AttributeValue, Int] =
@@ -64,7 +63,7 @@ trait AwsAttributeValueDecoder
           c.result()
         }
       }.leftMap { t: Throwable =>
-        new ExtractionError(t)
+        new ReadingError(t)
       }
     }
 
