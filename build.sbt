@@ -51,3 +51,29 @@ lazy val aws_dynamodb_bindings =
       testOptions in IntegrationTest += dynamoDBLocalTestCleanup.value,
       dynamoDBLocalDownloadIfOlderThan := 100.days
     )
+
+lazy val aws_dynamodb_v2_bindings =
+  (project in file("aws-dynamodb-v2-bindings"))
+    .settings(commonSettings)
+    .dependsOn(core)
+    .configs(IntegrationTest)
+    .settings(
+      inConfig(IntegrationTest)(baseDynamoDBSettings),
+      Defaults.itSettings,
+      name := "easycodecs-aws-dynamodb-v2-bindings",
+      libraryDependencies ++= Seq(
+        "software.amazon.awssdk" % "dynamodb" % "2.0.0-preview-1",
+        "org.typelevel" %% "cats" % Versions.cats,
+        "org.specs2" %% "specs2-core" % Versions.specs2 % "test, it"),
+      startDynamoDBLocal in IntegrationTest := startDynamoDBLocal
+        .dependsOn(compile in IntegrationTest)
+        .value,
+      test in IntegrationTest := (test in IntegrationTest)
+        .dependsOn(startDynamoDBLocal)
+        .value,
+      testOnly in IntegrationTest := (testOnly in IntegrationTest)
+        .dependsOn(startDynamoDBLocal)
+        .evaluated,
+      testOptions in IntegrationTest += dynamoDBLocalTestCleanup.value,
+      dynamoDBLocalDownloadIfOlderThan := 100.days
+    )
